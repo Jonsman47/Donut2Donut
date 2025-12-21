@@ -1,0 +1,268 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  username      String    @unique
+  image         String?
+  discordId     String?   @unique
+  emailVerified DateTime?
+  role          String    @default("USER") // USER | SELLER | MOD | ADMIN
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sellerProfile  SellerProfile?
+  listings       Listing[]
+  ordersBuy      Order[]        @relation("BuyerOrders")
+  ordersSell     Order[]        @relation("SellerOrders")
+  reviewsGiven   Review[]       @relation("ReviewsGiven")
+  reviewsGot     Review[]       @relation("ReviewsGot")
+  reportsMade    Report[]       @relation("ReportsMade")
+  reportsAgainst Report[]       @relation("ReportsAgainst")
+  disputesOpened Dispute[]      @relation("DisputesOpened")
+  trustEvents    TrustEvent[]
+}
+
+model SellerProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  bio       String?
+  bannerUrl String?
+  timezone  String?
+  rules     String?
+
+  discordVerified Boolean @default(false)
+  twoFAEnabled    Boolean @default(false)
+  idVerified      Boolean @default(false)
+
+  trustLevel         Int   @default(0) // 0..5
+  trustScore         Int   @default(0)
+  completionRate     Float @default(0)
+  disputeRate        Float @default(0)
+  avgDeliveryMinutes Int   @default(0)
+
+  listingLimit   Int @default(3)
+  maxPriceCents  Int @default(2000) // 20€
+  payoutHoldDays Int @default(7)
+
+  stripeAccountId String?
+  payoutsFrozen   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  parentId String?
+  parent   Category?  @relation("CategoryParent", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryParent")
+
+  listings Listing[]
+}
+
+model Listing {
+  id String @id @default(cuid())
+
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id])
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  title       String
+  description String
+  whatYouGet  String
+  priceCents  Int
+  currency    String @default("EUR")
+  stock       Int? // null = made to order/unlimited
+
+  deliveryType String // INSTANT_CODE | MANUAL_DM | INGAME_TRADE | SERVICE
+  escrowOnly   Boolean @default(true)
+
+  proofPolicy ProofPolicy?
+  images      ListingImage[]
+  orders      Order[]
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ListingImage {
+  id        String  @id @default(cuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model ProofPolicy {
+  id        String  @id @default(cuid())
+  listingId String  @unique
+  listing   Listing @relation(fields: [listingId], references: [id])
+
+  requireVideo         Boolean @default(false)
+  requireStamp         Boolean @default(true)
+  requireScoreboard    Boolean @default(false)
+  requireSafeTradeCode Boolean @default(false)
+}
+
+model Order {
+  id String @id @default(cuid())
+
+  buyerId String
+  buyer   User   @relation("BuyerOrders", fields: [buyerId], references: [id])
+
+  sellerId String
+  seller   User   @relation("SellerOrders", fields: [sellerId], references: [id])
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+
+  quantity         Int @default(1)
+  unitPriceCents   Int
+  subtotalCents    Int
+  platformFeeCents Int
+  totalCents       Int
+
+  status String @default("PAID")
+  // PAID | AWAITING_SELLER_ACCEPT | AWAITING_DELIVERY | DELIVERED | CONFIRMED
+  // DISPUTE_OPEN | DISPUTE_REVIEW | REFUNDED | PARTIAL_REFUND | RELEASED_TO_SELLER | CANCELLED
+
+  safeTradeCode        String
+  buyerDisputeDeadline DateTime
+
+  scheduleAt       DateTime?
+  scheduleTimezone String?
+
+  stripePaymentIntentId String?
+  stripeChargeId        String?
+  stripeTransferId      String?
+  escrowFundedAt        DateTime?
+  releasedAt            DateTime?
+
+  deliveryProofs DeliveryProof[]
+  disputes       Dispute[]
+  review         Review?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DeliveryProof {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  kind String // screenshot | video | file | message | code_log
+  url  String
+  hash String?
+  meta String? // JSON text
+
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id String @id @default(cuid())
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  fromId String
+  from   User   @relation("ReviewsGiven", fields: [fromId], references: [id])
+
+  toId String
+  to   User   @relation("ReviewsGot", fields: [toId], references: [id])
+
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model Dispute {
+  id String @id @default(cuid())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  status String @default("OPEN") // OPEN | WAITING_SELLER | REVIEW | DECIDED
+
+  whatPromised String
+  whatReceived String
+
+  // Store as JSON text because SQLite connector doesn't support String[]
+  evidenceUrls String @default("[]")
+
+  openedById String
+  openedBy   User   @relation("DisputesOpened", fields: [openedById], references: [id])
+
+  sellerResponse     String?
+  decision           String? // REFUND_BUYER | RELEASE_SELLER | PARTIAL_REFUND
+  partialRefundCents Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Report {
+  id String @id @default(cuid())
+
+  type    String // SCAM_ATTEMPT | FAKE_PROOF | HARASSMENT | STOLEN_CONTENT
+  message String
+
+  // Store as JSON text because SQLite connector doesn't support String[]
+  evidenceUrls String @default("[]")
+
+  reporterId String
+  reporter   User   @relation("ReportsMade", fields: [reporterId], references: [id])
+
+  targetUserId String?
+  targetUser   User?   @relation("ReportsAgainst", fields: [targetUserId], references: [id])
+
+  listingId String?
+  orderId   String?
+
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model TrustEvent {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  delta     Int
+  reason    String
+  meta      String? // JSON text
+  createdAt DateTime @default(now())
+}
+
+
+model DiscordVerifyCode {
+  code      String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
