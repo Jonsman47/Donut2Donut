@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SessionDebug } from "./session-debug";
 
 export default function Home() {
   return (
@@ -21,7 +22,9 @@ export default function Home() {
 
             {/* LEFT */}
             <div className="stack-10" style={{ minWidth: 0 }}>
-              <div className="kicker">Donut2Donut • escrow-first marketplace</div>
+              <div className="kicker">
+                Donut2Donut • escrow-first marketplace
+              </div>
 
               <h1
                 className="h1"
@@ -37,8 +40,8 @@ export default function Home() {
               </h1>
 
               <p className="p" style={{ maxWidth: 720 }}>
-                Escrow by default, proof-based delivery, and a structured dispute flow.
-                Built for fast decisions and clean trust.
+                Escrow by default, proof-based delivery, and a structured
+                dispute flow. Built for fast decisions and clean trust.
               </p>
 
               {/* SEARCH + CTAs */}
@@ -50,7 +53,14 @@ export default function Home() {
                     aria-label="Search marketplace"
                   />
 
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                    }}
+                  >
                     <Link className="btn btn-primary" href="/market">
                       Browse market
                     </Link>
@@ -58,7 +68,9 @@ export default function Home() {
                       Create listing
                     </Link>
 
-                    <span className="badge badge-good ring-glow">Escrow enabled</span>
+                    <span className="badge badge-good ring-glow">
+                      Escrow enabled
+                    </span>
                     <span className="badge badge-blue">Verified profiles</span>
                     <span className="badge">Audit logs</span>
                   </div>
@@ -78,7 +90,8 @@ export default function Home() {
                     <span className="badge badge-blue">Escrow</span>
                     <div className="h3">Funds held until confirmation</div>
                     <p className="p">
-                      Payment stays locked during delivery. Release happens after confirmation or resolution.
+                      Payment stays locked during delivery. Release happens
+                      after confirmation or resolution.
                     </p>
                   </div>
                 </div>
@@ -88,7 +101,8 @@ export default function Home() {
                     <span className="badge badge-blue">Proof</span>
                     <div className="h3">Proof-based delivery</div>
                     <p className="p">
-                      Listings can require screenshots, timestamps, or server logs to reduce disputes.
+                      Listings can require screenshots, timestamps, or server
+                      logs to reduce disputes.
                     </p>
                   </div>
                 </div>
@@ -98,7 +112,8 @@ export default function Home() {
                     <span className="badge badge-blue">Trust</span>
                     <div className="h3">Reputation you can read</div>
                     <p className="p">
-                      Verified sellers, delivery rate, dispute history, and review volume on every profile.
+                      Verified sellers, delivery rate, dispute history, and
+                      review volume on every profile.
                     </p>
                   </div>
                 </div>
@@ -108,7 +123,8 @@ export default function Home() {
                     <span className="badge badge-blue">Disputes</span>
                     <div className="h3">Structured dispute flow</div>
                     <p className="p">
-                      Clear evidence, timelines, and outcomes. No messy back-and-forth across DMs.
+                      Clear evidence, timelines, and outcomes. No messy
+                      back-and-forth across DMs.
                     </p>
                   </div>
                 </div>
@@ -122,7 +138,8 @@ export default function Home() {
                   <div className="kicker">Marketplace standard</div>
                   <div className="h2">Designed for trust-first decisions.</div>
                   <p className="p">
-                    Consistent UI, clear seller signals, and an escrow flow that prevents common trading failures.
+                    Consistent UI, clear seller signals, and an escrow flow that
+                    prevents common trading failures.
                   </p>
 
                   <div className="sep" />
@@ -132,27 +149,60 @@ export default function Home() {
 
                     <div className="surface" style={{ padding: 12 }}>
                       <div className="stack-4">
-                        <div style={{ fontWeight: 900, color: "var(--txt0)" }}>Escrow default</div>
-                        <div className="muted" style={{ fontSize: ".85rem" }}>
-                          Funds are held until delivery is confirmed or resolved.
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            color: "var(--txt0)",
+                          }}
+                        >
+                          Escrow default
+                        </div>
+                        <div
+                          className="muted"
+                          style={{ fontSize: ".85rem" }}
+                        >
+                          Funds are held until delivery is confirmed or
+                          resolved.
                         </div>
                       </div>
                     </div>
 
                     <div className="surface" style={{ padding: 12 }}>
                       <div className="stack-4">
-                        <div style={{ fontWeight: 900, color: "var(--txt0)" }}>Evidence-first disputes</div>
-                        <div className="muted" style={{ fontSize: ".85rem" }}>
-                          Proof requirements and audit logs support fast resolution.
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            color: "var(--txt0)",
+                          }}
+                        >
+                          Evidence-first disputes
+                        </div>
+                        <div
+                          className="muted"
+                          style={{ fontSize: ".85rem" }}
+                        >
+                          Proof requirements and audit logs support fast
+                          resolution.
                         </div>
                       </div>
                     </div>
 
                     <div className="surface" style={{ padding: 12 }}>
                       <div className="stack-4">
-                        <div style={{ fontWeight: 900, color: "var(--txt0)" }}>Verified identities</div>
-                        <div className="muted" style={{ fontSize: ".85rem" }}>
-                          Verified sellers and transparent trust signals on every listing.
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            color: "var(--txt0)",
+                          }}
+                        >
+                          Verified identities
+                        </div>
+                        <div
+                          className="muted"
+                          style={{ fontSize: ".85rem" }}
+                        >
+                          Verified sellers and transparent trust signals on
+                          every listing.
                         </div>
                       </div>
                     </div>
@@ -168,7 +218,8 @@ export default function Home() {
                 <div className="stack-8">
                   <span className="badge">Flow</span>
                   <div className="muted" style={{ fontSize: ".9rem" }}>
-                    Buyer pays → escrow holds → seller delivers + proof → buyer confirms → payout.
+                    Buyer pays → escrow holds → seller delivers + proof → buyer
+                    confirms → payout.
                   </div>
                 </div>
               </div>
@@ -184,14 +235,15 @@ export default function Home() {
           </div>
         </div>
 
-        {/* HOW IT WORKS (THIS was dark — now wrapped in section-glow) */}
+        {/* HOW IT WORKS */}
         <div className="section-tight">
           <div className="section-glow">
             <div className="stack-10">
               <div className="kicker">How it works</div>
               <h2 className="h2">Escrow workflow</h2>
               <p className="p" style={{ maxWidth: 780 }}>
-                A simple, consistent process that reduces fraud and speeds up delivery confirmation.
+                A simple, consistent process that reduces fraud and speeds up
+                delivery confirmation.
               </p>
 
               <div className="grid-cards">
@@ -199,16 +251,21 @@ export default function Home() {
                   <div style={{ padding: 14 }} className="stack-8">
                     <span className="badge badge-blue">01</span>
                     <div className="h3">Payment is held in escrow</div>
-                    <p className="p">Funds are locked while the seller completes delivery.</p>
+                    <p className="p">
+                      Funds are locked while the seller completes delivery.
+                    </p>
                   </div>
                 </div>
 
                 <div className="card card-hover">
                   <div style={{ padding: 14 }} className="stack-8">
                     <span className="badge badge-blue">02</span>
-                    <div className="h3">Seller delivers and submits proof</div>
+                    <div className="h3">
+                      Seller delivers and submits proof
+                    </div>
                     <p className="p">
-                      Proof requirements depend on the listing (screenshots, logs, timestamps).
+                      Proof requirements depend on the listing (screenshots,
+                      logs, timestamps).
                     </p>
                   </div>
                 </div>
@@ -216,8 +273,13 @@ export default function Home() {
                 <div className="card card-hover">
                   <div style={{ padding: 14 }} className="stack-8">
                     <span className="badge badge-blue">03</span>
-                    <div className="h3">Confirmation or dispute resolution</div>
-                    <p className="p">Buyer confirms delivery, or a dispute is resolved using evidence and logs.</p>
+                    <div className="h3">
+                      Confirmation or dispute resolution
+                    </div>
+                    <p className="p">
+                      Buyer confirms delivery, or a dispute is resolved using
+                      evidence and logs.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -235,6 +297,9 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* DEBUG SESSION */}
+        <SessionDebug />
       </section>
     </div>
   );
