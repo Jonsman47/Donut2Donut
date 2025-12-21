@@ -13,7 +13,7 @@ type TokenShape = {
   discordId?: string;
 };
 
-function slugUsername(input: string): string {
+function slugUsername(input: string): string {  
   return input
     .trim()
     .toLowerCase()
@@ -79,6 +79,7 @@ async function upsertDiscordUser(params: {
 }
 
 export const authOptions: NextAuthOptions = {
+  debug: true,
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
   pages: { signIn: "/login" },

@@ -2,13 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  // Permet de lire les paramètres dans l'URL (tout ce qui est après le ?)
+  const searchParams = useSearchParams();
+  // On récupère la valeur du paramètre "error" (ex: /login?error=discord)
+  const error = searchParams.get("error");
+
+  // Champs pour le dev login
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
 
+  // On affiche le bloc "Dev login" seulement si NEXT_PUBLIC_DEV_LOGIN_ENABLED=1
   const showDev = useMemo(() => {
-    // show dev login UI only if you set NEXT_PUBLIC_DEV_LOGIN_ENABLED=1
     return process.env.NEXT_PUBLIC_DEV_LOGIN_ENABLED === "1";
   }, []);
 
@@ -19,9 +26,15 @@ export default function LoginPage() {
           <div className="h2">Login</div>
           <div className="p">Log in to access seller features and verification.</div>
 
+          {error ? (
+            <div className="p" style={{ color: "red" }}>
+              Error: {error}
+            </div>
+          ) : null}
+
           <button
             className="btn btn-primary"
-            onClick={() => signIn("discord", { callbackUrl: "/verify" })}
+            onClick={() => signIn("discord", { callbackUrl: "/" })}
           >
             Continue with Discord
           </button>
@@ -65,4 +78,3 @@ export default function LoginPage() {
     </div>
   );
 }
-  
