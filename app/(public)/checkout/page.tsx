@@ -36,7 +36,7 @@ export default function CheckoutPage() {
       <div style={{marginTop:10}} className="small">{status}</div>
       {orderId && <div style={{marginTop:10}} className="pill">Order: <b>{orderId}</b></div>}
       <div style={{marginTop:12}}>
-        <a className="btn" href="/orders">Go to Orders</a>
+        <a className="btn" href="/market/orders">Go to Orders</a>
       </div>
     </div>
   );

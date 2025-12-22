@@ -60,11 +60,122 @@ export async function POST(req: NextRequest) {
       subtotalCents,
       platformFeeCents,
       totalCents,
-      status: "PAID",
+      status: "PENDING",
       safeTradeCode,
       buyerDisputeDeadline,
     },
   });
 
+  await prisma.notification.create({
+    data: {
+      userId: listing.sellerId,
+      type: "ORDER_STATUS",
+      data: JSON.stringify({
+        orderId: order.id,
+        status: order.status,
+      }),
+    },
+  });
+
+  await prisma.conversation.upsert({
+    where: {
+      listingId_buyerId_sellerId: {
+        listingId: listing.id,
+        buyerId,
+        sellerId: listing.sellerId,
+      },
+    },
+    create: {
+      listingId: listing.id,
+      buyerId,
+      sellerId: listing.sellerId,
+      lastMessageAt: new Date(),
+    },
+    update: {},
+  });
+
   return NextResponse.json({ order });
+}
+
+export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.id) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const userId = session.user.id as string;
+  const url = new URL(req.url);
+  const role = url.searchParams.get("role") || "buyer";
+
+  const where =
+    role === "seller" ? { sellerId: userId } : { buyerId: userId };
+
+  const orders = await prisma.order.findMany({
+    where,
+    include: {
+      listing: { include: { images: true } },
+      buyer: true,
+      seller: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const conversationKeys = orders.map((order) => ({
+    listingId: order.listingId,
+    buyerId: order.buyerId,
+    sellerId: order.sellerId,
+  }));
+
+  const conversations = conversationKeys.length
+    ? await prisma.conversation.findMany({
+        where: {
+          OR: conversationKeys.map((key) => ({
+            listingId: key.listingId,
+            buyerId: key.buyerId,
+            sellerId: key.sellerId,
+          })),
+        },
+      })
+    : [];
+
+  const conversationByKey = new Map(
+    conversations.map((conv) => [
+      `${conv.listingId ?? "none"}:${conv.buyerId}:${conv.sellerId}`,
+      conv,
+    ])
+  );
+
+  const conversationIds = conversations.map((conv) => conv.id);
+  const unreadMessages = conversationIds.length
+    ? await prisma.message.findMany({
+        where: {
+          conversationId: { in: conversationIds },
+          readAt: null,
+          NOT: { senderId: userId },
+        },
+        select: { conversationId: true },
+      })
+    : [];
+
+  const unreadCounts = unreadMessages.reduce<Record<string, number>>(
+    (acc, msg) => {
+      acc[msg.conversationId] = (acc[msg.conversationId] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
+  const payload = orders.map((order) => {
+    const key = `${order.listingId}:${order.buyerId}:${order.sellerId}`;
+    const conversation = conversationByKey.get(key);
+    return {
+      ...order,
+      conversationId: conversation?.id ?? null,
+      unreadMessages: conversation
+        ? unreadCounts[conversation.id] ?? 0
+        : 0,
+    };
+  });
+
+  return NextResponse.json({ orders: payload });
 }
