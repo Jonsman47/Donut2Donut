@@ -1,0 +1,5782 @@
+diff --git a/app/(public)/listing/[id]/ListingActions.tsx b/app/(public)/listing/[id]/ListingActions.tsx
+new file mode 100644
+index 0000000..e08d631
+--- /dev/null
++++ b/app/(public)/listing/[id]/ListingActions.tsx
+@@ -0,0 +1,126 @@
++"use client";
++
++import { useState } from "react";
++
++export function ListingActions({ listingId }: { listingId: string }) {
++  const [loading, setLoading] = useState(false);
++  const [info, setInfo] = useState<string | null>(null);
++  const [error, setError] = useState<string | null>(null);
++  const [deleting, setDeleting] = useState(false);
++
++  async function handleRequest() {
++    try {
++      setLoading(true);
++      setInfo(null);
++      setError(null);
++
++      const res = await fetch("/api/orders", {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ listingId, quantity: 1 }),
++      });
++
++      if (!res.ok) {
++        const data = await res.json().catch(() => ({}));
++        throw new Error(
++          (data as any).error || "Erreur lors de la création de la commande"
++        );
++      }
++
++      const data = await res.json();
++      setInfo(
++        `Commande créée ! Code d'échange : ${data.order.safeTradeCode} (status: ${data.order.status})`
++      );
++    } catch (err: any) {
++      setError(err.message || "Erreur inconnue");
++    } finally {
++      setLoading(false);
++    }
++  }
++
++  async function handleDelete() {
++    try {
++      const ok = confirm(
++        "Tu es sûr de vouloir supprimer cette annonce ? Cette action est définitive."
++      );
++      if (!ok) return;
++
++      setDeleting(true);
++      setError(null);
++      setInfo(null);
++
++      const res = await fetch(`/api/listings/${listingId}`, {
++        method: "DELETE",
++      });
++
++      if (!res.ok) {
++        const data = await res.json().catch(() => ({}));
++        throw new Error(
++          (data as any).error || "Erreur lors de la suppression de l'annonce"
++        );
++      }
++
++      // Redirection simple vers le marché après suppression
++      window.location.href = "/market";
++    } catch (err: any) {
++      setError(err.message || "Erreur inconnue");
++    } finally {
++      setDeleting(false);
++    }
++  }
++
++  return (
++    <div className="stack-6">
++      {/* Étape 1 : créer une demande d'achat */}
++      <button
++        className="btn btn-primary"
++        style={{ width: "100%" }}
++        onClick={handleRequest}
++        disabled={loading || deleting}
++      >
++        {loading
++          ? "Création de la demande d'achat..."
++          : "Étape 1 · Envoyer une demande d'achat"}
++      </button>
++
++      {/* Nouveau bouton : supprimer l'annonce */}
++      <button
++        className="btn btn-ghost"
++        style={{ width: "100%" }}
++        type="button"
++        onClick={handleDelete}
++        disabled={loading || deleting}
++      >
++        {deleting ? "Suppression en cours..." : "Supprimer l’annonce"}
++      </button>
++
++      {info && (
++        <div
++          style={{
++            fontSize: 12,
++            color: "#bbf7d0",
++            border: "1px solid #22c55e44",
++            borderRadius: 8,
++            padding: "6px 8px",
++          }}
++        >
++          {info}
++        </div>
++      )}
++
++      {error && (
++        <div
++          style={{
++            fontSize: 12,
++            color: "#fecaca",
++            border: "1px solid #fca5a544",
++            borderRadius: 8,
++            padding: "6px 8px",
++          }}
++        >
++          {error}
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/app/(public)/listing/[id]/page.tsx b/app/(public)/listing/[id]/page.tsx
+index caf66c9..3498eb6 100644
+--- a/app/(public)/listing/[id]/page.tsx
++++ b/app/(public)/listing/[id]/page.tsx
+@@ -1,493 +1,378 @@
+ "use client";
++
+ import Image from "next/image";
+ import { notFound } from "next/navigation";
+ import { getListingById } from "@/lib/demo";
++import { ListingActions } from "./ListingActions";
+ 
+ type PageProps = {
+   params: { id: string };
+ };
+ 
++type TradeStage =
++  | "REQUEST"
++  | "ACCEPT"
++  | "PAY"
++  | "INGAME"
++  | "PROOFS"
++  | "COMPLETE"
++  | "DISPUTE";
++
+ export default async function ListingPage({ params }: PageProps) {
+   const listing = await getListingById(params.id);
+   if (!listing) return notFound();
+ 
+-  return (
+-    <div className="listing-page">
+-      {/* MAIN GRID */}
+-      <section className="listing-grid">
+-        {/* LEFT */}
+-        <div className="listing-left">
+-          <div className="media-card">
+-            <div className="media">
+-              <Image
+-                src={listing.imageUrl}
+-                alt={listing.title}
+-                width={1400}
+-                height={900}
+-                className="media-img"
+-                priority
+-              />
+-            </div>
+-          </div>
+-
+-          <div className="card">
+-            <h1 className="title">{listing.title}</h1>
+-            <p className="muted">
+-              Payment is held in escrow. Seller must upload proof. You confirm or dispute.
+-            </p>
+-
+-            <div className="headline-row">
+-              <span className="pill on">Escrow ON</span>
+-              <span className="pill dim">Dispute: 48h</span>
+-              <span className="pill dim">{listing.delivery}</span>
+-              {listing.tags?.[0] ? <span className="pill dim">{listing.tags[0]}</span> : null}
+-            </div>
+-          </div>
+-
+-          <div className="card">
+-            <h2 className="h">What you receive</h2>
+-            <ul className="list">
+-              <li>Exactly what’s listed (no bait swaps)</li>
+-              <li>Delivery via agreed method</li>
+-              <li>Proof uploaded by seller</li>
+-              <li>Dispute window if something’s off</li>
+-            </ul>
+-          </div>
+-
+-          <div className="card">
+-            <h2 className="h">Delivery & rules</h2>
++  // Pour l'instant : stage fixe (mock)
++  const stage: TradeStage = "REQUEST";
+ 
+-            <div className="kv">
+-              <span>Delivery</span>
+-              <strong>{listing.delivery}</strong>
+-            </div>
+-
+-            <div className="kv">
+-              <span>Seller proof required</span>
+-              <strong>Yes</strong>
+-            </div>
+-
+-            <div className="kv">
+-              <span>Escrow release</span>
+-              <strong>After confirmation</strong>
+-            </div>
++  return (
++    <div style={{ paddingTop: 86 }}>
++      <section className="container section-tight">
++        <div
++          style={{
++            display: "grid",
++            gridTemplateColumns: "1.4fr .8fr",
++            gap: 16,
++          }}
++        >
++          {/* LEFT : annonce + flow */}
++          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
++            {/* Media + titre */}
++            <div
++              className="surface glass border-grad"
++              style={{ padding: 12, borderRadius: 22 }}
++            >
++              <div
++                style={{
++                  borderRadius: 18,
++                  overflow: "hidden",
++                  marginBottom: 10,
++                }}
++              >
++                <Image
++                  src={listing.imageUrl}
++                  alt={listing.title}
++                  width={1400}
++                  height={900}
++                  style={{
++                    width: "100%",
++                    height: 260,
++                    objectFit: "cover",
++                  }}
++                  priority
++                />
++              </div>
+ 
+-            <div className="kv">
+-              <span>Dispute window</span>
+-              <strong>48 hours</strong>
++              <div className="stack-6">
++                <div className="kicker">Annonce DonutSMP</div>
++                <h1
++                  className="h1"
++                  style={{ fontSize: 22, fontWeight: 950, margin: 0 }}
++                >
++                  {listing.title}
++                </h1>
++                <p
++                  className="p"
++                  style={{ fontSize: 14, color: "#9ca3af", margin: 0 }}
++                >
++                  Trade encadré par escrow : demande d&apos;achat, acceptation,
++                  paiement, échange in‑game, preuves vidéo et litiges 48h.
++                </p>
++
++                <div
++                  style={{
++                    display: "flex",
++                    gap: 8,
++                    flexWrap: "wrap",
++                    marginTop: 6,
++                  }}
++                >
++                  <span className="badge badge-good">Escrow ON</span>
++                  <span className="badge">Preuves vidéo requises</span>
++                  <span className="badge">Litige 48h</span>
++                  <span className="badge">
++                    Livraison : {listing.delivery}
++                  </span>
++                </div>
++              </div>
+             </div>
+-          </div>
+-
+-          <div className="card">
+-            <h2 className="h">Seller</h2>
+ 
+-            <div className="seller-card">
+-              <div className="avatar" />
+-              <div className="seller-meta">
+-                <div className="seller-name">{listing.sellerName}</div>
+-                <div className="seller-sub">
+-                  {listing.trustPercent}% trust • {listing.reviewCount} reviews
++            {/* Flow 4 étapes + litiges */}
++            <div className="surface glass" style={{ padding: 14, borderRadius: 22 }}>
++              <div className="stack-8">
++                <div className="kicker">Flow de trade</div>
++                <h2 className="h2" style={{ fontSize: 18, margin: 0 }}>
++                  Comment ce trade va se dérouler
++                </h2>
++
++                <div className="stack-6">
++                  <TradeStep
++                    step="Étape 1"
++                    title="Mise en vente & demande d'achat"
++                    active={stage === "REQUEST"}
++                    description="Le vendeur liste l'item (pioche, kit, service) avec pseudo Minecraft et prix. L'acheteur envoie une demande d'achat depuis cette page."
++                  />
++                  <TradeStep
++                    step="Étape 2"
++                    title="Acceptation & paiement escrow"
++                    active={stage === "ACCEPT" || stage === "PAY"}
++                    description="Le vendeur accepte la demande. L'acheteur paie via le site, l'argent est bloqué en escrow. Un code d'échange unique est généré pour ce trade."
++                  />
++                  <TradeStep
++                    step="Étape 3"
++                    title="Échange in‑game discret"
++                    active={stage === "INGAME"}
++                    description="Les deux joueurs se connectent sur Donut SMP (alts, coords, ender chest) et font l'échange sans /trade visible. Chacun enregistre une courte vidéo."
++                  />
++                  <TradeStep
++                    step="Étape 4"
++                    title="Validation, libération & litiges"
++                    active={stage === "PROOFS" || stage === "COMPLETE"}
++                    description="Les preuves vidéo sont upload sur le site et les deux cliquent “Échange OK”. Si tout est clean, l'escrow paie le vendeur. Sinon, un litige peut être ouvert pendant 48h."
++                  />
++                  <TradeStep
++                    step="Litiges"
++                    title="Scam & résolution"
++                    active={stage === "DISPUTE"}
++                    description="Si un joueur ne respecte pas les règles (pas de vidéo, item manquant...), l'autre peut ouvrir un litige. Les preuves sont analysées, l'argent va à la victime et le scammeur est blacklisté."
++                  />
+                 </div>
+               </div>
+-
+-              {listing.sellerVerified ? (
+-                <span className="badge verify">Verified</span>
+-              ) : (
+-                <span className="badge dimBadge">Standard</span>
+-              )}
+             </div>
+ 
+-            <div className="seller-grid">
+-              <div className="seller-stat">
+-                <div className="k">Trust</div>
+-                <div className="v">{listing.trustPercent}%</div>
+-              </div>
+-              <div className="seller-stat">
+-                <div className="k">Reviews</div>
+-                <div className="v">{listing.reviewCount}</div>
++            {/* Vendeur / confiance */}
++            <div className="surface glass" style={{ padding: 14, borderRadius: 22 }}>
++              <h2 className="h2" style={{ fontSize: 16, marginBottom: 8 }}>
++                Vendeur & confiance
++              </h2>
++              <div
++                style={{
++                  display: "flex",
++                  alignItems: "center",
++                  gap: 10,
++                  marginBottom: 10,
++                }}
++              >
++                <div
++                  style={{
++                    width: 40,
++                    height: 40,
++                    borderRadius: 999,
++                    background:
++                      "radial-gradient(circle at 30% 30%, rgba(120,220,255,.24), rgba(10,16,32,.6))",
++                    border: "1px solid rgba(120,170,255,.18)",
++                  }}
++                />
++                <div>
++                  <div style={{ fontWeight: 900 }}>{listing.sellerName}</div>
++                  <div
++                    style={{
++                      fontSize: 12,
++                      color: "#9ca3af",
++                    }}
++                  >
++                    {listing.trustPercent}% trust • {listing.reviewCount} reviews
++                  </div>
++                </div>
++                <span
++                  className="badge"
++                  style={{ marginLeft: "auto", fontSize: 11 }}
++                >
++                  {listing.sellerVerified ? "Vendeur vérifié" : "Vendeur standard"}
++                </span>
+               </div>
+-              <div className="seller-stat">
+-                <div className="k">Delivery</div>
+-                <div className="v">{listing.delivery}</div>
++
++              <div
++                style={{
++                  display: "grid",
++                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
++                  gap: 8,
++                }}
++              >
++                <StatBox label="Trust" value={`${listing.trustPercent}%`} />
++                <StatBox
++                  label="Avis"
++                  value={listing.reviewCount.toString()}
++                />
++                <StatBox label="Livraison" value={listing.delivery} />
+               </div>
+             </div>
+           </div>
+ 
+-          <div className="card">
+-            <h2 className="h">Reviews (demo)</h2>
+-            <div className="review">
+-              <div className="r-top">
+-                <strong>buyer_neo</strong>
+-                <span className="r-pill">Verified purchase</span>
++          {/* RIGHT : bloc trade / actions */}
++          <aside
++            style={{
++              position: "sticky",
++              top: 90,
++              alignSelf: "flex-start",
++            }}
++          >
++            <div
++              className="surface-strong glass border-grad"
++              style={{ padding: 16, borderRadius: 22 }}
++            >
++              <div
++                style={{
++                  fontSize: 22,
++                  fontWeight: 950,
++                  marginBottom: 4,
++                }}
++              >
++                {listing.priceLabel}
+               </div>
+-              <p className="r-text">
+-                Clean delivery. Proof was instant. Felt safe.
+-              </p>
+-            </div>
+-            <div className="review">
+-              <div className="r-top">
+-                <strong>skullbyte</strong>
+-                <span className="r-pill">Fast</span>
++              <div
++                style={{
++                  fontSize: 12,
++                  color: "#9ca3af",
++                  marginBottom: 10,
++                }}
++              >
++                Prix indicatif de cette annonce démo. Plus tard, ce montant sera
++                lié à une commande escrow réelle (Order) avec paiement et code
++                d&apos;échange.
+               </div>
+-              <p className="r-text">
+-                Got it quick. Would buy again.
+-              </p>
+-            </div>
+-          </div>
+-        </div>
+-
+-        {/* RIGHT */}
+-        <aside className="listing-right">
+-          <div className="buy-card">
+-            <div className="price">{listing.priceLabel}</div>
+-
+-            <div className="qty">
+-              <button aria-label="Decrease quantity">-</button>
+-              <input aria-label="Quantity" defaultValue={1} />
+-              <button aria-label="Increase quantity">+</button>
+-            </div>
+-
+-            <button className="buy-btn">Buy now</button>
+ 
+-            <div className="safe">
+-              <span className="pill on">Escrow ON</span>
+-              <span className="pill dim">Dispute 48h</span>
+-              <span className="pill dim">Proof required</span>
+-            </div>
++              {/* À terme : quantité + total */}
++              <div
++                style={{
++                  marginBottom: 12,
++                  display: "flex",
++                  gap: 8,
++                  alignItems: "center",
++                }}
++              >
++                <span style={{ fontSize: 12, color: "#9ca3af" }}>
++                  Quantité (mock)
++                </span>
++                <input
++                  className="input"
++                  defaultValue={1}
++                  style={{ width: 60, padding: 6, fontSize: 13 }}
++                />
++              </div>
+ 
+-            <div className="icons">
+-              <span>🔒 Secure</span>
+-              <span>⚡ Fast</span>
+-              <span>🛡️ Protected</span>
+-            </div>
++              {/* Actions : Étape 1 réelle + reste mock */}
++              <div className="stack-8">
++                <ListingActions listingId={listing.id} />
++
++                <button className="btn btn-ghost" style={{ width: "100%" }}>
++                  Étape 2 · (Vendeur) Accepter la demande (mock)
++                </button>
++                <button className="btn btn-ghost" style={{ width: "100%" }}>
++                  Étape 3 · (Acheteur) Payer et recevoir le code (mock)
++                </button>
++                <button className="btn btn-ghost" style={{ width: "100%" }}>
++                  Étape 4 · Uploader les preuves & confirmer (mock)
++                </button>
++                <button
++                  className="btn btn-ghost"
++                  style={{ width: "100%", marginTop: 4 }}
++                >
++                  Ouvrir un litige (mock)
++                </button>
++              </div>
+ 
+-            <div className="note">
+-              Seller gets paid after delivery is confirmed. If something’s off, dispute within 48h.
++              <div
++                className="p"
++                style={{
++                  fontSize: 11,
++                  color: "#9ca3af",
++                  marginTop: 10,
++                }}
++              >
++                Quand on branchera Prisma et les Orders, ces boutons mettront à
++                jour le statut du trade (REQUESTED, PAID, INGAME, COMPLETED,
++                DISPUTED…) et déclencheront le payout ou le refund.
++              </div>
+             </div>
+-          </div>
+-        </aside>
++          </aside>
++        </div>
+       </section>
++    </div>
++  );
++}
+ 
+-      {/* MOBILE STICKY BUY */}
+-      <div className="mobile-buy">
+-        <div className="mobile-price">{listing.priceLabel}</div>
+-        <button className="mobile-btn">Buy now</button>
+-      </div>
+-
+-      <style jsx>{`
+-        .listing-page{
+-          display:flex;
+-          flex-direction:column;
+-          gap: 16px;
+-        }
+-
+-        .listing-grid{
+-          display:grid;
+-          grid-template-columns: 1.4fr .8fr;
+-          gap: 14px;
+-        }
+-
+-        .listing-left{
+-          display:flex;
+-          flex-direction:column;
+-          gap: 12px;
+-        }
+-
+-        .media-card{
+-          border-radius: 24px;
+-          overflow:hidden;
+-          border: 1px solid rgba(120,170,255,.14);
+-          background: rgba(14,22,40,.54);
+-          box-shadow: 0 24px 90px rgba(0,0,0,.38);
+-        }
+-
+-        .media{
+-          height: 320px;
+-          overflow:hidden;
+-        }
+-
+-        .media-img{
+-          width:100%;
+-          height:100%;
+-          object-fit:cover;
+-          filter: blur(1px) saturate(1.05);
+-          transform: scale(1.06);
+-        }
+-
+-        .card{
+-          border-radius: 22px;
+-          padding: 14px;
+-          background: rgba(10,16,32,.38);
+-          border: 1px solid rgba(120,170,255,.12);
+-          box-shadow: 0 16px 60px rgba(0,0,0,.26);
+-        }
+-
+-        .title{
+-          margin:0;
+-          font-size: 22px;
+-          font-weight: 950;
+-        }
+-
+-        .muted{
+-          color: rgba(234,241,255,.70);
+-          margin-top: 6px;
+-          font-size: 14px;
+-        }
+-
+-        .headline-row{
+-          display:flex;
+-          gap: 8px;
+-          flex-wrap: wrap;
+-          margin-top: 10px;
+-        }
+-
+-        .h{
+-          margin:0 0 8px;
+-          font-size: 16px;
+-          font-weight: 950;
+-        }
+-
+-        .list{
+-          padding-left: 18px;
+-          margin:0;
+-          display:flex;
+-          flex-direction:column;
+-          gap: 6px;
+-        }
+-
+-        .kv{
+-          display:flex;
+-          justify-content:space-between;
+-          padding: 8px 0;
+-          border-bottom: 1px solid rgba(120,170,255,.08);
+-        }
+-
+-        .seller-card{
+-          display:flex;
+-          align-items:center;
+-          gap: 10px;
+-        }
+-
+-        .avatar{
+-          width: 44px;
+-          height: 44px;
+-          border-radius: 999px;
+-          background: radial-gradient(circle at 30% 30%, rgba(120,220,255,.24), rgba(10,16,32,.6));
+-          border: 1px solid rgba(120,170,255,.18);
+-        }
+-
+-        .seller-name{
+-          font-weight: 950;
+-        }
+-
+-        .seller-sub{
+-          font-size: 12px;
+-          color: rgba(234,241,255,.70);
+-        }
+-
+-        .badge{
+-          margin-left:auto;
+-          padding: 6px 10px;
+-          border-radius: 999px;
+-          border: 1px solid rgba(120,170,255,.16);
+-          font-weight: 900;
+-          font-size: 12px;
+-          background: rgba(10,16,32,.34);
+-        }
+-
+-        .verify{
+-          background: rgba(120,220,255,.10);
+-        }
+-
+-        .dimBadge{
+-          opacity: .85;
+-        }
+-
+-        .seller-grid{
+-          display:grid;
+-          grid-template-columns: repeat(3, minmax(0,1fr));
+-          gap: 8px;
+-          margin-top: 12px;
+-        }
+-
+-        .seller-stat{
+-          border-radius: 18px;
+-          padding: 10px 10px;
+-          border: 1px solid rgba(120,170,255,.10);
+-          background: rgba(10,16,32,.28);
+-        }
+-        .k{
+-          font-size: 12px;
+-          color: rgba(234,241,255,.68);
+-          font-weight: 850;
+-        }
+-        .v{
+-          margin-top: 4px;
+-          font-weight: 950;
+-          font-size: 14px;
+-        }
+-
+-        .review{
+-          border-radius: 18px;
+-          padding: 12px 12px;
+-          border: 1px solid rgba(120,170,255,.10);
+-          background: rgba(10,16,32,.28);
+-          margin-top: 8px;
+-        }
+-        .r-top{
+-          display:flex;
+-          justify-content:space-between;
+-          align-items:center;
+-          gap: 10px;
+-        }
+-        .r-pill{
+-          padding: 6px 10px;
+-          border-radius: 999px;
+-          font-size: 12px;
+-          font-weight: 900;
+-          border: 1px solid rgba(120,170,255,.12);
+-          background: rgba(120,170,255,.08);
+-        }
+-        .r-text{
+-          margin: 8px 0 0;
+-          color: rgba(234,241,255,.72);
+-          font-size: 13px;
+-          line-height: 1.4;
+-        }
+-
+-        .listing-right{
+-          position: sticky;
+-          top: 90px;
+-          height: fit-content;
+-        }
+-
+-        .buy-card{
+-          border-radius: 24px;
+-          padding: 16px;
+-          background: linear-gradient(180deg, rgba(14,22,40,.62), rgba(14,22,40,.46));
+-          border: 1px solid rgba(120,170,255,.18);
+-          box-shadow: 0 24px 100px rgba(0,0,0,.40);
+-          display:flex;
+-          flex-direction:column;
+-          gap: 12px;
+-        }
+-
+-        .price{
+-          font-size: 26px;
+-          font-weight: 950;
+-        }
+-
+-        .qty{
+-          display:flex;
+-          gap: 8px;
+-          align-items:center;
+-        }
+-
+-        .qty button{
+-          width: 34px;
+-          height: 34px;
+-          border-radius: 12px;
+-          border: 1px solid rgba(120,170,255,.16);
+-          background: rgba(10,16,32,.44);
+-          color: #eaf1ff;
+-          font-weight: 900;
+-          cursor:pointer;
+-        }
+-
+-        .qty input{
+-          width: 56px;
+-          text-align:center;
+-          border-radius: 12px;
+-          border: 1px solid rgba(120,170,255,.16);
+-          background: rgba(10,16,32,.44);
+-          color:#eaf1ff;
+-          font-weight: 900;
+-          padding: 10px 0;
+-        }
+-
+-        .buy-btn{
+-          padding: 14px;
+-          border-radius: 18px;
+-          font-weight: 950;
+-          border: 1px solid rgba(120,220,255,.22);
+-          background: linear-gradient(180deg, rgba(120,220,255,.26), rgba(120,170,255,.14));
+-          box-shadow: 0 18px 70px rgba(0,0,0,.30);
+-          cursor:pointer;
+-        }
+-
+-        .safe{
+-          display:flex;
+-          gap: 8px;
+-          flex-wrap: wrap;
+-        }
+-
+-        .pill{
+-          padding: 7px 10px;
+-          border-radius: 999px;
+-          border: 1px solid rgba(120,170,255,.14);
+-          font-weight: 900;
+-          font-size: 12px;
+-        }
+-
+-        .on{
+-          background: rgba(120,220,255,.10);
+-        }
+-
+-        .dim{
+-          background: rgba(10,16,32,.32);
+-          color: rgba(234,241,255,.70);
+-        }
+-
+-        .icons{
+-          display:flex;
+-          justify-content:space-between;
+-          font-size: 12px;
+-          color: rgba(234,241,255,.70);
+-        }
+-
+-        .note{
+-          font-size: 12px;
+-          color: rgba(234,241,255,.68);
+-          line-height: 1.4;
+-          border-top: 1px solid rgba(120,170,255,.10);
+-          padding-top: 10px;
+-        }
+-
+-        .mobile-buy{
+-          display:none;
+-        }
++type TradeStepProps = {
++  step: string;
++  title: string;
++  description: string;
++  active: boolean;
++};
+ 
+-        @media (max-width: 900px){
+-          .listing-grid{
+-            grid-template-columns: 1fr;
+-          }
+-          .listing-right{
+-            position: static;
+-          }
+-        }
++function TradeStep({ step, title, description, active }: TradeStepProps) {
++  return (
++    <div
++      style={{
++        display: "flex",
++        gap: 8,
++        alignItems: "flex-start",
++        opacity: active ? 1 : 0.75,
++      }}
++    >
++      <div
++        style={{
++          width: 22,
++          height: 22,
++          borderRadius: 999,
++          border: "2px solid rgba(120,170,255,0.6)",
++          background: active
++            ? "rgba(120,170,255,0.2)"
++            : "rgba(10,16,32,0.6)",
++          marginTop: 2,
++          display: "flex",
++          alignItems: "center",
++          justifyContent: "center",
++          fontSize: 10,
++          fontWeight: 900,
++          color: "#e5f3ff",
++        }}
++      >
++        {step.replace("Étape ", "")}
++      </div>
++      <div>
++        <div
++          style={{
++            fontSize: 13,
++            fontWeight: 800,
++            marginBottom: 2,
++          }}
++        >
++          {title}
++        </div>
++        <div
++          style={{
++            fontSize: 12,
++            color: "#9ca3af",
++          }}
++        >
++          {description}
++        </div>
++      </div>
++    </div>
++  );
++}
+ 
+-        @media (max-width: 520px){
+-          .mobile-buy{
+-            position: sticky;
+-            bottom: 0;
+-            display:flex;
+-            justify-content:space-between;
+-            align-items:center;
+-            gap: 10px;
+-            padding: 12px;
+-            background: rgba(10,16,32,.88);
+-            border-top: 1px solid rgba(120,170,255,.18);
+-          }
+-          .mobile-btn{
+-            padding: 12px 16px;
+-            border-radius: 14px;
+-            font-weight: 950;
+-            border: 1px solid rgba(120,220,255,.22);
+-            background: linear-gradient(180deg, rgba(120,220,255,.26), rgba(120,170,255,.14));
+-            cursor:pointer;
+-          }
+-        }
+-      `}</style>
++function StatBox({ label, value }: { label: string; value: string }) {
++  return (
++    <div
++      style={{
++        borderRadius: 16,
++        padding: 10,
++        border: "1px solid rgba(120,170,255,.12)",
++        background: "rgba(10,16,32,.32)",
++      }}
++    >
++      <div
++        style={{
++          fontSize: 11,
++          color: "#9ca3af",
++          textTransform: "uppercase",
++          letterSpacing: ".06em",
++        }}
++      >
++        {label}
++      </div>
++      <div style={{ marginTop: 4, fontWeight: 950, fontSize: 14 }}>{value}</div>
+     </div>
+   );
+ }
+diff --git a/app/(public)/market/page.tsx b/app/(public)/market/page.tsx
+index 287a85f..256a387 100644
+--- a/app/(public)/market/page.tsx
++++ b/app/(public)/market/page.tsx
+@@ -1,10 +1,27 @@
+ "use client";
+ 
+-import { useMemo, useState } from "react";
+-import ListingCard from "../../../components/ListingCard";
+-import { getDemoListings } from "../../../lib/demo";
++import { useState, useEffect } from "react";
++import { useSession } from "next-auth/react";
++import Link from "next/link";
++import items from "../../../lib/mc-items.json";
+ 
+-type Filter = "All" | "Items" | "Currency" | "Services";
++type ListingType = "item" | "service";
++type Tab = "sales" | "buys";
++
++type Listing = {
++  id: string;
++  title: string;
++  description: string;
++  priceLabel: string;
++  sellerName: string;
++  trustPercent: number;
++  reviewCount: number;
++  imageUrl: string;
++  type: ListingType;
++  quantity?: number;
++  imagesCount: number;
++  sellerId: string;
++};
+ 
+ function parsePrice(label: string) {
+   const n = Number(String(label).replace(/[^0-9.]/g, ""));
+@@ -12,181 +29,390 @@ function parsePrice(label: string) {
+ }
+ 
+ export default function MarketPage() {
++  const { data: session } = useSession();
++  const userId = (session?.user as any)?.id;
++
++  const [tab, setTab] = useState<Tab>("sales");
+   const [query, setQuery] = useState("");
+-  const [filter, setFilter] = useState<Filter>("All");
+-  const [sort, setSort] = useState("Featured");
+-  const [isLoading, setIsLoading] = useState(false);
+ 
+-  const listings = useMemo(() => getDemoListings(), []);
++  const [listingType, setListingType] = useState<ListingType>("item");
++  const [title, setTitle] = useState("");
++  const [description, setDescription] = useState("");
++  const [quantity, setQuantity] = useState(1);
++  const [price, setPrice] = useState<number | "">("");
++  const [images, setImages] = useState<File[]>([]);
++  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
++  const [error, setError] = useState<string | null>(null);
+ 
+-  const filtered = useMemo(() => {
+-    const q = query.trim().toLowerCase();
++  const [editingId, setEditingId] = useState<string | null>(null);
+ 
+-    let out = listings.filter((l: any) => {
+-      const hay = `${l.title} ${l.sellerName} ${l.priceLabel}`.toLowerCase();
+-      const matchesQuery = q.length === 0 || hay.includes(q);
++  const [allListings, setAllListings] = useState<Listing[]>([]);
++  const [loadingListings, setLoadingListings] = useState(true);
+ 
+-      const type = String((l as any).type ?? "").toLowerCase();
+-      const matchesFilter =
+-        filter === "All" ||
+-        (filter === "Items" && (type.includes("item") || type === "")) ||
+-        (filter === "Currency" && type.includes("currency")) ||
+-        (filter === "Services" && type.includes("service"));
++  const [itemSearch, setItemSearch] = useState("");
++  const [showDropdown, setShowDropdown] = useState(false);
++  const allItems = items.values as string[];
++  const filteredItems = allItems.filter((name) =>
++    name.toLowerCase().includes(itemSearch.toLowerCase())
++  );
+ 
+-      return matchesQuery && matchesFilter;
+-    });
++  // Charger toutes les annonces quand la session change
++  useEffect(() => {
++    async function loadListings() {
++      try {
++        const res = await fetch("/api/listings");
++        const data = await res.json();
+ 
+-    switch (sort) {
+-      case "Price: Low":
+-        out = out.slice().sort(
+-          (a: any, b: any) => parsePrice(a.priceLabel) - parsePrice(b.priceLabel)
+-        );
+-        break;
+-      case "Price: High":
+-        out = out.slice().sort(
+-          (a: any, b: any) => parsePrice(b.priceLabel) - parsePrice(a.priceLabel)
+-        );
+-        break;
+-      case "Trust: High":
+-        out = out.slice().sort(
+-          (a: any, b: any) => (b.trustPercent ?? 0) - (a.trustPercent ?? 0)
+-        );
+-        break;
+-      default:
+-        break;
++        const mapped: Listing[] = data.listings.map((l: any) => ({
++          id: l.id,
++          title: l.title,
++          description: l.description,
++          priceLabel: (l.priceCents / 100).toFixed(2) + " €",
++          sellerName: l.seller?.username ?? "Unknown",
++          trustPercent: l.seller?.sellerProfile?.trustScore ?? 0,
++          reviewCount: 0,
++          imageUrl: l.images && l.images.length > 0 ? l.images[0].url : "/donut3.png",
++          type: l.deliveryType === "SERVICE" ? "service" : "item",
++          quantity: l.stock ?? undefined,
++          imagesCount: l.images?.length ?? 0,
++          sellerId: l.seller?.id ?? "",
++        }));
++
++        setAllListings(mapped);
++      } catch (e) {
++        console.error(e);
++      } finally {
++        setLoadingListings(false);
++      }
++    }
++
++    loadListings();
++  }, [userId, session]); // Re-load quand l'user change
++
++  function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
++    const files = e.target.files;
++    if (!files) return;
++
++    const newFiles: File[] = [];
++    const newPreviews: string[] = [];
++
++    for (let i = 0; i < files.length; i++) {
++      const file = files[i];
++      newFiles.push(file);
++      newPreviews.push(URL.createObjectURL(file));
++    }
++
++    setImages(newFiles);
++    setImagePreviews(newPreviews);
++  }
++
++  async function handleCreateOrUpdateListing() {
++    setError(null);
++
++    if (!title.trim()) {
++      setError("Title is required.");
++      return;
++    }
++    if (!description.trim()) {
++      setError("Description is required.");
++      return;
++    }
++    if (listingType === "item" && (!quantity || quantity <= 0)) {
++      setError("Quantity must be greater than 0 for items.");
++      return;
++    }
++    if (price === "" || price <= 0) {
++      setError("Price must be greater than 0.");
++      return;
++    }
++    if (!editingId && images.length === 0) {
++      setError("At least one screenshot is required.");
++      return;
++    }
++
++    const priceLabel = `${price.toFixed(2)} €`;
++
++    const coverUrl = imagePreviews[0] ?? "/donut3.png";
++
++    if (editingId) {
++      setAllListings((prev) =>
++        prev.map((l) =>
++          l.id === editingId
++            ? {
++                ...l,
++                title:
++                  listingType === "item"
++                    ? `${quantity}x ${title.trim()}`
++                    : title.trim(),
++                description: description.trim(),
++                priceLabel,
++                imageUrl: coverUrl,
++                type: listingType,
++                quantity: listingType === "item" ? quantity : undefined,
++              }
++            : l
++        )
++      );
++    } else {
++      try {
++        const res = await fetch("/api/listings", {
++          method: "POST",
++          headers: { "Content-Type": "application/json" },
++          body: JSON.stringify({
++            title:
++              listingType === "item"
++                ? `${quantity}x ${title.trim()}`
++                : title.trim(),
++            description: description.trim(),
++            whatYouGet: description.trim(),
++            priceCents: Math.round((price as number) * 100),
++            stock: listingType === "item" ? quantity : null,
++            deliveryType: listingType === "item" ? "INGAME_TRADE" : "SERVICE",
++          }),
++        });
++
++        if (!res.ok) {
++          const data = await res.json();
++          setError(data.error || "Failed to create listing.");
++          return;
++        }
++
++        const data = await res.json();
++
++        setAllListings((prev) => [
++          {
++            id: data.listing.id,
++            title: data.listing.title,
++            description: data.listing.description,
++            priceLabel: (data.listing.priceCents / 100).toFixed(2) + " €",
++            sellerName: session?.user?.name ?? "You",
++            trustPercent: 0,
++            reviewCount: 0,
++            imageUrl: coverUrl,
++            type: listingType,
++            quantity: listingType === "item" ? quantity : undefined,
++            imagesCount: images.length,
++            sellerId: userId ?? "",
++          },
++          ...prev,
++        ]);
++      } catch (e) {
++        console.error(e);
++        setError("Server error while creating listing.");
++        return;
++      }
++    }
++
++    resetForm();
++  }
++
++  function resetForm() {
++    setEditingId(null);
++    setTitle("");
++    setDescription("");
++    setQuantity(1);
++    setPrice("");
++    setImages([]);
++    setImagePreviews([]);
++    setListingType("item");
++    setError(null);
++    setItemSearch("");
++    setShowDropdown(false);
++  }
++
++  function handleEditClick(listing: Listing) {
++    setEditingId(listing.id);
++
++    let baseTitle = listing.title;
++    let qty = 1;
++    if (listing.type === "item") {
++      const match = listing.title.match(/^(\d+)x\s+(.*)$/);
++      if (match) {
++        qty = Number(match[1]) || 1;
++        baseTitle = match[2];
++      }
+     }
+ 
+-    return out;
+-  }, [listings, query, filter, sort]);
++    setListingType(listing.type);
++    setTitle(baseTitle);
++    setItemSearch(baseTitle);
++    setDescription(listing.description);
++    setQuantity(listing.quantity ?? qty);
++    const numericPrice = parsePrice(listing.priceLabel);
++    setPrice(Number.isFinite(numericPrice) ? numericPrice : "");
++    setImages([]);
++    setImagePreviews([]);
++    setError(null);
++  }
++
++  async function handleDelete(listingId: string) {
++    const ok = confirm("Tu es sûr de vouloir supprimer cette annonce ?");
++    if (!ok) return;
+ 
+-  function fakeRefresh() {
+-    setIsLoading(true);
+-    window.setTimeout(() => setIsLoading(false), 450);
++    try {
++      const res = await fetch(`/api/listings/${listingId}`, {
++        method: "DELETE",
++      });
++
++      if (!res.ok) {
++        const data = await res.json().catch(() => ({}));
++        alert(
++          (data as any).error || "Erreur lors de la suppression de l'annonce."
++        );
++        return;
++      }
++
++      setAllListings((prev) => prev.filter((l) => l.id !== listingId));
++    } catch (e) {
++      console.error(e);
++      alert("Server error while deleting listing.");
++    }
+   }
+ 
++  // Filtrer : "My listings" = celles du user connecté, "Buys" = celles des autres
++  const myListings = allListings.filter((l) => l.sellerId === userId);
++  const otherListings = allListings.filter((l) => l.sellerId !== userId);
++
++  const filteredSales = (tab === "sales" ? myListings : otherListings)
++    .slice()
++    .sort((a, b) => parsePrice(a.priceLabel) - parsePrice(b.priceLabel))
++    .filter((l) => {
++      const q = query.trim().toLowerCase();
++      if (!q) return true;
++      const haystack = `${l.title} ${l.description} ${l.priceLabel}`.toLowerCase();
++      return haystack.includes(q);
++    });
++
++  const listToShow = filteredSales;
++
+   return (
+-    <div>
+-      <section className="section-tight">
+-        <div className="container stack-20">
+-          <div className="card" style={{ padding: 24 }}>
+-            <div className="stack-16">
+-              <div className="stack-8">
+-                <span className="kicker">Donut2Donut marketplace</span>
+-                <h1 className="h1">Browse listings with escrow protection.</h1>
+-                <p className="p" style={{ maxWidth: 720 }}>
+-                  Clear proof requirements and structured disputes, built for real trades.
++    <div style={{ paddingTop: 86 }}>
++      <section className="container section-tight">
++        <div className="stack-10">
++          {/* HEADER */}
++          <div className="surface-strong glass border-grad" style={{ padding: 16 }}>
++            <div
++              style={{
++                display: "flex",
++                justifyContent: "space-between",
++                gap: 16,
++                alignItems: "flex-start",
++              }}
++            >
++              <div className="stack-8" style={{ flex: 1, minWidth: 0 }}>
++                <div className="kicker">Donut2Donut • Escrow marketplace</div>
++                <h1 className="h1" style={{ marginBottom: 4 }}>
++                  DonutSMP trading hub
++                </h1>
++                <p className="p" style={{ maxWidth: 640 }}>
++                  Create listings for items or services and trade through an
++                  escrow‑first flow with proofs and disputes.
+                 </p>
+-              </div>
+ 
+-              <div className="stack-12">
+                 <div
+-                  style={{
+-                    display: "grid",
+-                    gridTemplateColumns: "1fr auto",
+-                    gap: 10,
+-                  }}
++                  className="surface glass"
++                  style={{ padding: 10, marginTop: 10 }}
+                 >
+-                  <input
+-                    className="input"
+-                    value={query}
+-                    onChange={(e) => setQuery(e.target.value)}
+-                    placeholder="Search items, services, sellers…"
+-                  />
+-                  <button className="btn btn-primary" onClick={fakeRefresh}>
+-                    Search
+-                  </button>
+-                </div>
+-
+-                <div
+-                  style={{
+-                    display: "flex",
+-                    gap: 10,
+-                    flexWrap: "wrap",
+-                    justifyContent: "space-between",
+-                    alignItems: "center",
+-                  }}
+-                >
+-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+-                    {(["All", "Items", "Currency", "Services"] as Filter[]).map(
+-                      (f) => (
+-                        <button
+-                          key={f}
+-                          onClick={() => {
+-                            setFilter(f);
+-                            fakeRefresh();
+-                          }}
+-                          className={f === filter ? "btn btn-soft" : "btn btn-ghost"}
+-                          style={{ height: 36, paddingInline: 14, borderRadius: 999 }}
+-                        >
+-                          {f}
+-                        </button>
+-                      )
+-                    )}
+-                  </div>
+-
+-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+-                    <span className="badge badge-good">Escrow On</span>
+-                    <select
+-                      className="input select"
+-                      value={sort}
+-                      onChange={(e) => {
+-                        setSort(e.target.value);
+-                        fakeRefresh();
++                  <div className="stack-6">
++                    <input
++                      className="input"
++                      value={query}
++                      onChange={(e) => setQuery(e.target.value)}
++                      placeholder={
++                        tab === "sales"
++                          ? "Search in your listings…"
++                          : "Search in available listings…"
++                      }
++                    />
++                    <div
++                      style={{
++                        fontSize: 12,
++                        color: "#9ca3af",
++                        display: "flex",
++                        justifyContent: "space-between",
++                        gap: 8,
++                        flexWrap: "wrap",
+                       }}
+-                      style={{ width: 200 }}
+                     >
+-                      <option>Featured</option>
+-                      <option>Price: Low</option>
+-                      <option>Price: High</option>
+-                      <option>Trust: High</option>
+-                    </select>
++                      <span>
++                        Current tab: {tab === "sales" ? "My listings" : "Available listings"}
++                      </span>
++                      <span>Escrow • Proofs • 48h disputes</span>
++                    </div>
+                   </div>
+                 </div>
+               </div>
++            </div>
++          </div>
+ 
+-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+-                <span className="badge badge-primary">{filtered.length} results</span>
+-                <span className="badge">Proof required</span>
+-                <span className="badge">Disputes</span>
+-                <span className="badge badge-primary">Verified sellers</span>
+-              </div>
++          {/* TABS */}
++          <div className="surface glass" style={{ padding: 10 }}>
++            <div style={{ display: "flex", gap: 8 }}>
++              <button
++                type="button"
++                className={tab === "sales" ? "btn btn-soft" : "btn btn-ghost"}
++                onClick={() => setTab("sales")}
++              >
++                My listings
++              </button>
++              <button
++                type="button"
++                className={tab === "buys" ? "btn btn-soft" : "btn btn-ghost"}
++                onClick={() => setTab("buys")}
++              >
++                Available listings
++              </button>
+             </div>
+           </div>
+ 
+-          {isLoading ? (
+-            <div className="grid-cards">
+-              {Array.from({ length: 8 }).map((_, i) => (
+-                <div key={i} className="card">
+-                  <div className="skel" style={{ height: 180 }} />
+-                  <div className="card-body stack-8">
+-                    <div className="skel" style={{ height: 14, width: "70%" }} />
+-                    <div className="skel" style={{ height: 14, width: "50%" }} />
+-                    <div className="skel" style={{ height: 32 }} />
++          {/* CREATE / EDIT PANEL */}
++          {tab === "sales" && (
++            <div className="surface glass" style={{ padding: 18 }}>
++              <div
++                style={{
++                  display: "grid",
++                  gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)",
++                  gap: 16,
++                }}
++              >
++                <div className="stack-8">
++                  <div className="kicker">
++                    {editingId ? "Edit listing" : "New listing"}
+                   </div>
+-                </div>
+-              ))}
+-            </div>
+-          ) : (
+-            <div className="grid-cards">
+-              {filtered.map((l: any) => (
+-                <ListingCard
+-                  key={l.id}
+-                  href={`/listing/${l.id}`}
+-                  title={l.title}
+-                  imageUrl={l.imageUrl}
+-                  priceLabel={l.priceLabel}
+-                  sellerName={l.sellerName}
+-                  sellerVerified={l.sellerVerified}
+-                  trustPercent={l.trustPercent}
+-                  reviewCount={l.reviewCount}
+-                  delivery={l.delivery}
+-                  escrowOn={l.escrowOn}
+-                />
+-              ))}
+-            </div>
+-          )}
+-        </div>
+-      </section>
+-    </div>
+-  );
+-}
++                  <h2 className="h2">
++                    {editingId ? "Update your sale" : "Create a sale"}
++                  </h2>
++
++                  {error && (
++                    <div
++                      className="p"
++                      style={{
++                        fontSize: 13,
++                        color: "#b91c1c",
++                        backgroundColor: "#FEE2E2",
++                        border: "1px solid #FCA5A5",
++                        borderRadius: 6,
++                        padding: "6px 10px",
++                      }}
++                    >
++                      {error}
++                    </div>
++                  )}
++
++                  <div style={{ display: "flex", gap: 8 }}>
++                    <button
++                      type="button"
++                      className={
++                        listingType === "item" ? "btn btn-soft" : "btn btn-ghost"
++                      }
++                      onClick={() => setListingType("item")}
++                    >
++                      Items
++                    </button>
++                    <button
++                      type="button"
++                      className={
++                        listingType === "service"
++                          ? "btn btn-soft"
++                          : "btn btn-ghost"
++                      }
+diff --git a/app/(public)/orders/[id]/page.tsx b/app/(public)/orders/[id]/page.tsx
+index 2220770..f7cb1cb 100644
+--- a/app/(public)/orders/[id]/page.tsx
++++ b/app/(public)/orders/[id]/page.tsx
+@@ -1,5 +1,3 @@
+-"use client";
+-
+ import Link from "next/link";
+ 
+ type Step =
+diff --git a/app/(public)/orders/page.tsx b/app/(public)/orders/page.tsx
+index 54abc9c..da2b814 100644
+--- a/app/(public)/orders/page.tsx
++++ b/app/(public)/orders/page.tsx
+@@ -1,5 +1,3 @@
+-"use client";
+-
+ import Link from "next/link";
+ 
+ type OrderStatus = "Pending" | "In Escrow" | "Delivered" | "Disputed" | "Completed";
+diff --git a/app/(public)/page.tsx b/app/(public)/page.tsx
+index 9ece2c3..5792180 100644
+--- a/app/(public)/page.tsx
++++ b/app/(public)/page.tsx
+@@ -1,132 +1,305 @@
+-import Image from "next/image";
++"use client";
++
+ import Link from "next/link";
+-import { pickDonutImage } from "../../lib/donut-images";
++import { SessionDebug } from "./session-debug";
+ 
+ export default function Home() {
+-  const heroImage = pickDonutImage(0);
+-  const accentImage = pickDonutImage(1);
+-
+   return (
+-    <div>
+-      <section className="section">
+-        <div className="container">
+-          <div className="hero fade-up">
+-            <div className="hero-grid" style={{ padding: "40px" }}>
+-              <div className="stack-20" style={{ textAlign: "center" }}>
+-                <span className="kicker">Donut2Donut</span>
+-                <h1 className="h1">The trusted DonutSMP marketplace.</h1>
+-                <p className="p">
+-                  Escrow-first trades with clear proof and fast resolution.
+-                </p>
+-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+-                  <Link className="btn btn-primary" href="/market">
+-                    Get started
+-                  </Link>
+-                  <Link className="btn btn-secondary" href="/rules">
+-                    Learn more
+-                  </Link>
+-                </div>
+-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+-                  <span className="badge badge-primary">Escrow default</span>
+-                  <span className="badge">Verified profiles</span>
+-                  <span className="badge badge-accent">Dispute support</span>
++    <div style={{ paddingTop: 86 }}>
++      <section className="container section-tight">
++        {/* HERO */}
++        <div className="hero surface-strong border-grad glass fade-up">
++          <div
++            className="hero-inner"
++            style={{
++              display: "grid",
++              gridTemplateColumns: "7fr 5fr",
++              gap: 16,
++              alignItems: "start",
++            }}
++          >
++            <div className="crystal-glow" />
++
++            {/* LEFT */}
++            <div className="stack-10" style={{ minWidth: 0 }}>
++              <div className="kicker">
++                Donut2Donut • escrow-first marketplace
++              </div>
++
++              <h1
++                className="h1"
++                style={{
++                  fontSize: "clamp(2.8rem, 5.0vw, 4.1rem)",
++                  lineHeight: 1.02,
++                  fontWeight: 950,
++                  letterSpacing: "-0.035em",
++                  maxWidth: 860,
++                }}
++              >
++                Secure trading for DonutSMP.
++              </h1>
++
++              <p className="p" style={{ maxWidth: 720 }}>
++                Escrow by default, proof-based delivery, and a structured
++                dispute flow. Built for fast decisions and clean trust.
++              </p>
++
++              {/* SEARCH + CTAs */}
++              <div className="surface glass" style={{ padding: 12 }}>
++                <div className="stack-10">
++                  <input
++                    className="input"
++                    placeholder="Search listings, sellers, services…"
++                    aria-label="Search marketplace"
++                  />
++
++                  <div
++                    style={{
++                      display: "flex",
++                      gap: 10,
++                      flexWrap: "wrap",
++                      alignItems: "center",
++                    }}
++                  >
++                    <Link className="btn btn-primary" href="/market">
++                      Browse market
++                    </Link>
++                    <Link className="btn btn-ghost" href="/market">
++                      Create listing
++                    </Link>
++
++                    <span className="badge badge-good ring-glow">
++                      Escrow enabled
++                    </span>
++                    <span className="badge badge-blue">Verified profiles</span>
++                    <span className="badge">Audit logs</span>
++                  </div>
+                 </div>
+               </div>
+ 
+-              <div className="hero-visual" style={{ maxWidth: 460, margin: "0 auto" }}>
+-                <Image
+-                  src={heroImage}
+-                  alt="Donut marketplace"
+-                  width={520}
+-                  height={420}
+-                  priority
+-                />
++              {/* TRUST GRID */}
++              <div
++                style={{
++                  display: "grid",
++                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
++                  gap: 12,
++                }}
++              >
++                <div className="card card-hover">
++                  <div style={{ padding: 14 }} className="stack-8">
++                    <span className="badge badge-blue">Escrow</span>
++                    <div className="h3">Funds held until confirmation</div>
++                    <p className="p">
++                      Payment stays locked during delivery. Release happens
++                      after confirmation or resolution.
++                    </p>
++                  </div>
++                </div>
++
++                <div className="card card-hover">
++                  <div style={{ padding: 14 }} className="stack-8">
++                    <span className="badge badge-blue">Proof</span>
++                    <div className="h3">Proof-based delivery</div>
++                    <p className="p">
++                      Listings can require screenshots, timestamps, or server
++                      logs to reduce disputes.
++                    </p>
++                  </div>
++                </div>
++
++                <div className="card card-hover">
++                  <div style={{ padding: 14 }} className="stack-8">
++                    <span className="badge badge-blue">Trust</span>
++                    <div className="h3">Reputation you can read</div>
++                    <p className="p">
++                      Verified sellers, delivery rate, dispute history, and
++                      review volume on every profile.
++                    </p>
++                  </div>
++                </div>
++
++                <div className="card card-hover">
++                  <div style={{ padding: 14 }} className="stack-8">
++                    <span className="badge badge-blue">Disputes</span>
++                    <div className="h3">Structured dispute flow</div>
++                    <p className="p">
++                      Clear evidence, timelines, and outcomes. No messy
++                      back-and-forth across DMs.
++                    </p>
++                  </div>
++                </div>
+               </div>
+             </div>
+-          </div>
+-        </div>
+-      </section>
+ 
+-      <section className="section-tight section-muted">
+-        <div className="container">
+-          <div className="grid-3">
+-            {[
+-              {
+-                title: "Escrow by default",
+-                text: "Funds stay protected until delivery is confirmed.",
+-              },
+-              {
+-                title: "Proof-first delivery",
+-                text: "Clear evidence requirements reduce disputes.",
+-              },
+-              {
+-                title: "Transparent trust",
+-                text: "Verified sellers and visible reputation signals.",
+-              },
+-            ].map((card) => (
+-              <div key={card.title} className="card card-hover" style={{ padding: "24px" }}>
+-                <div className="stack-12" style={{ textAlign: "center" }}>
+-                  <div className="h3">{card.title}</div>
+-                  <p className="p">{card.text}</p>
++            {/* RIGHT */}
++            <div className="stack-10" style={{ minWidth: 0 }}>
++              <div className="surface glass border-grad" style={{ padding: 14 }}>
++                <div className="stack-10">
++                  <div className="kicker">Marketplace standard</div>
++                  <div className="h2">Designed for trust-first decisions.</div>
++                  <p className="p">
++                    Consistent UI, clear seller signals, and an escrow flow that
++                    prevents common trading failures.
++                  </p>
++
++                  <div className="sep" />
++
++                  <div className="stack-8">
++                    <span className="badge badge-blue">Core guarantees</span>
++
++                    <div className="surface" style={{ padding: 12 }}>
++                      <div className="stack-4">
++                        <div
++                          style={{
++                            fontWeight: 900,
++                            color: "var(--txt0)",
++                          }}
++                        >
++                          Escrow default
++                        </div>
++                        <div
++                          className="muted"
++                          style={{ fontSize: ".85rem" }}
++                        >
++                          Funds are held until delivery is confirmed or
++                          resolved.
++                        </div>
++                      </div>
++                    </div>
++
++                    <div className="surface" style={{ padding: 12 }}>
++                      <div className="stack-4">
++                        <div
++                          style={{
++                            fontWeight: 900,
++                            color: "var(--txt0)",
++                          }}
++                        >
++                          Evidence-first disputes
++                        </div>
++                        <div
++                          className="muted"
++                          style={{ fontSize: ".85rem" }}
++                        >
++                          Proof requirements and audit logs support fast
++                          resolution.
++                        </div>
++                      </div>
++                    </div>
++
++                    <div className="surface" style={{ padding: 12 }}>
++                      <div className="stack-4">
++                        <div
++                          style={{
++                            fontWeight: 900,
++                            color: "var(--txt0)",
++                          }}
++                        >
++                          Verified identities
++                        </div>
++                        <div
++                          className="muted"
++                          style={{ fontSize: ".85rem" }}
++                        >
++                          Verified sellers and transparent trust signals on
++                          every listing.
++                        </div>
++                      </div>
++                    </div>
++
++                    <Link className="btn btn-primary btn-wide" href="/market">
++                      Open market
++                    </Link>
++                  </div>
+                 </div>
+               </div>
+-            ))}
+-          </div>
+-        </div>
+-      </section>
+ 
+-      <section className="section">
+-        <div className="container">
+-          <div className="social-strip">
+-            <div className="stack-6" style={{ textAlign: "center" }}>
+-              <span className="kicker">Security</span>
+-              <div className="h3">Escrow coverage</div>
+-              <span className="p">100% protected funds</span>
+-            </div>
+-            <div className="stack-6" style={{ textAlign: "center" }}>
+-              <span className="kicker">Speed</span>
+-              <div className="h3">Fast resolution</div>
+-              <span className="p">Clear dispute steps</span>
+-            </div>
+-            <div className="stack-6" style={{ textAlign: "center" }}>
+-              <span className="kicker">Trust</span>
+-              <div className="h3">Verified sellers</div>
+-              <span className="p">Transparent profiles</span>
++              <div className="surface glass" style={{ padding: 14 }}>
++                <div className="stack-8">
++                  <span className="badge">Flow</span>
++                  <div className="muted" style={{ fontSize: ".9rem" }}>
++                    Buyer pays → escrow holds → seller delivers + proof → buyer
++                    confirms → payout.
++                  </div>
++                </div>
++              </div>
+             </div>
++
++            <style jsx>{`
++              @media (max-width: 980px) {
++                .hero-inner {
++                  grid-template-columns: 1fr !important;
++                }
++              }
++            `}</style>
+           </div>
+         </div>
+-      </section>
+ 
+-      <section className="section-tight">
+-        <div className="container">
+-          <div className="card" style={{ padding: "36px" }}>
+-            <div className="grid-2" style={{ alignItems: "center" }}>
+-              <div className="stack-16">
+-                <span className="kicker">Get started</span>
+-                <div className="h2">Trade with confidence.</div>
+-                <p className="p">
+-                  Post listings or browse the market with escrow protection.
+-                </p>
+-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+-                  <Link className="btn btn-primary" href="/market">
+-                    Open market
+-                  </Link>
+-                  <Link className="btn btn-secondary" href="/seller">
+-                    Become a seller
+-                  </Link>
++        {/* HOW IT WORKS */}
++        <div className="section-tight">
++          <div className="section-glow">
++            <div className="stack-10">
++              <div className="kicker">How it works</div>
++              <h2 className="h2">Escrow workflow</h2>
++              <p className="p" style={{ maxWidth: 780 }}>
++                A simple, consistent process that reduces fraud and speeds up
++                delivery confirmation.
++              </p>
++
++              <div className="grid-cards">
++                <div className="card card-hover">
++                  <div style={{ padding: 14 }} className="stack-8">
++                    <span className="badge badge-blue">01</span>
++                    <div className="h3">Payment is held in escrow</div>
++                    <p className="p">
++                      Funds are locked while the seller completes delivery.
++                    </p>
++                  </div>
++                </div>
++
++                <div className="card card-hover">
++                  <div style={{ padding: 14 }} className="stack-8">
++                    <span className="badge badge-blue">02</span>
++                    <div className="h3">
++                      Seller delivers and submits proof
++                    </div>
++                    <p className="p">
++                      Proof requirements depend on the listing (screenshots,
++                      logs, timestamps).
++                    </p>
++                  </div>
++                </div>
++
++                <div className="card card-hover">
++                  <div style={{ padding: 14 }} className="stack-8">
++                    <span className="badge badge-blue">03</span>
++                    <div className="h3">
++                      Confirmation or dispute resolution
++                    </div>
++                    <p className="p">
++                      Buyer confirms delivery, or a dispute is resolved using
++                      evidence and logs.
++                    </p>
++                  </div>
+                 </div>
+               </div>
+-              <div className="card-media">
+-                <Image
+-                  src={accentImage}
+-                  alt="Donut product"
+-                  width={480}
+-                  height={360}
+-                />
++
++              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
++                <Link className="btn btn-primary" href="/market">
++                  Browse listings
++                </Link>
++                <Link className="btn btn-ghost" href="/market">
++                  Create listing
++                </Link>
++                <span className="badge badge-good">Escrow enabled</span>
++                <span className="badge">Audit logs</span>
+               </div>
+             </div>
+           </div>
+         </div>
++
++        {/* DEBUG SESSION */}
++        <SessionDebug />
+       </section>
+     </div>
+   );
+diff --git a/app/(public)/rules/page.tsx b/app/(public)/rules/page.tsx
+index 397832a..33c4628 100644
+--- a/app/(public)/rules/page.tsx
++++ b/app/(public)/rules/page.tsx
+@@ -1,5 +1,3 @@
+-"use client";
+-
+ import Link from "next/link";
+ 
+ const RULE_SECTIONS = [
+diff --git a/app/(public)/seller/[username]/new/page.tsx b/app/(public)/seller/[username]/new/page.tsx
+index c1084c7..fd6a10c 100644
+--- a/app/(public)/seller/[username]/new/page.tsx
++++ b/app/(public)/seller/[username]/new/page.tsx
+@@ -1,5 +1,3 @@
+-"use client";
+-
+ import Link from "next/link";
+ 
+ export default function NewListingPage() {
+diff --git a/app/(public)/seller/[username]/page.tsx b/app/(public)/seller/[username]/page.tsx
+index 238d781..168fb8d 100644
+--- a/app/(public)/seller/[username]/page.tsx
++++ b/app/(public)/seller/[username]/page.tsx
+@@ -1,5 +1,3 @@
+-"use client";
+-
+ import Link from "next/link";
+ 
+ export default function SellerPage() {
+diff --git a/app/(public)/session-debug.tsx b/app/(public)/session-debug.tsx
+index c3c8921..1116308 100644
+--- a/app/(public)/session-debug.tsx
++++ b/app/(public)/session-debug.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+ import { useSession } from "next-auth/react";
++import { signIn, signOut } from "next-auth/react";
+ 
+ export function SessionDebug() {
+   const { data: session, status } = useSession();
+@@ -22,13 +23,83 @@ export function SessionDebug() {
+ 
+       {status === "authenticated" && (
+         <pre style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+-{JSON.stringify(session, null, 2)}
++          {JSON.stringify(session, null, 2)}
+         </pre>
+       )}
+ 
+       {status === "unauthenticated" && (
+         <div style={{ marginTop: 8 }}>Pas connecté</div>
+       )}
++
++      {/* Boutons de login de test */}
++      <div
++        style={{
++          marginTop: 10,
++          display: "flex",
++          flexWrap: "wrap",
++          gap: 8,
++        }}
++      >
++        {/* Compte acheteur */}
++        <button
++          style={{
++            padding: "6px 10px",
++            borderRadius: 4,
++            border: "1px solid rgba(255,255,255,0.2)",
++            background: "rgba(15,23,42,0.9)",
++            color: "white",
++            cursor: "pointer",
++            fontSize: 12,
++          }}
++          onClick={() =>
++            signIn("credentials", {
++              redirect: false,
++              username: "buyer-demo", // nom EXACT dans ta DB
++              // ajoute ici password si ton provider en a besoin
++            })
++          }
++        >
++          Se connecter en buyer-demo
++        </button>
++
++        {/* Compte vendeur */}
++        <button
++          style={{
++            padding: "6px 10px",
++            borderRadius: 4,
++            border: "1px solid rgba(255,255,255,0.2)",
++            background: "rgba(15,23,42,0.9)",
++            color: "white",
++            cursor: "pointer",
++            fontSize: 12,
++          }}
++          onClick={() =>
++            signIn("credentials", {
++              redirect: false,
++              username: "seller-demo", // nom EXACT dans ta DB
++              // ajoute ici password si ton provider en a besoin
++            })
++          }
++        >
++          Se connecter en seller-demo
++        </button>
++
++        {/* Déconnexion */}
++        <button
++          style={{
++            padding: "6px 10px",
++            borderRadius: 4,
++            border: "1px solid rgba(255,255,255,0.2)",
++            background: "rgba(127,29,29,0.9)",
++            color: "white",
++            cursor: "pointer",
++            fontSize: 12,
++          }}
++          onClick={() => signOut({ redirect: false })}
++        >
++          Se déconnecter
++        </button>
++      </div>
+     </div>
+   );
+ }
+diff --git a/app/api/listings/[id]/route.ts b/app/api/listings/[id]/route.ts
+new file mode 100644
+index 0000000..929414e
+--- /dev/null
++++ b/app/api/listings/[id]/route.ts
+@@ -0,0 +1,62 @@
++import { NextResponse } from "next/server";
++import { prisma } from "@/lib/prisma";
++import { getServerSession } from "next-auth";
++import { authOptions } from "@/lib/auth";
++
++type RouteParams = { params: { id: string } };
++
++// DELETE /api/listings/[id]
++export async function DELETE(_req: Request, { params }: RouteParams) {
++  try {
++    const listingId = params.id;
++
++    if (!listingId) {
++      return NextResponse.json(
++        { error: "Missing listing id" },
++        { status: 400 }
++      );
++    }
++
++    // Vérifier que l'utilisateur est connecté
++    const session = await getServerSession(authOptions);
++    if (!session || !session.user || !(session.user as any).id) {
++      return NextResponse.json(
++        { error: "Not authenticated" },
++        { status: 401 }
++      );
++    }
++    const userId = (session.user as any).id as string;
++
++    // Vérifier que l'annonce existe et appartient à ce user
++    const listing = await prisma.listing.findUnique({
++      where: { id: listingId },
++      select: { sellerId: true },
++    });
++
++    if (!listing) {
++      return NextResponse.json(
++        { error: "Listing not found" },
++        { status: 404 }
++      );
++    }
++
++    if (listing.sellerId !== userId) {
++      return NextResponse.json(
++        { error: "You are not the owner of this listing" },
++        { status: 403 }
++      );
++    }
++
++    await prisma.listing.delete({
++      where: { id: listingId },
++    });
++
++    return NextResponse.json({ success: true }, { status: 200 });
++  } catch (e) {
++    console.error("Error deleting listing:", e);
++    return NextResponse.json(
++      { error: "Failed to delete listing" },
++      { status: 500 }
++    );
++  }
++}
+diff --git a/app/api/listings/route.ts b/app/api/listings/route.ts
+index b2b4a8e..0b64982 100644
+--- a/app/api/listings/route.ts
++++ b/app/api/listings/route.ts
+@@ -1,6 +1,9 @@
+ import { NextResponse } from "next/server";
+-import { db } from "@/lib/db";
++import { prisma } from "@/lib/prisma";
++import { getServerSession } from "next-auth";
++import { authOptions } from "@/lib/auth";
+ 
++// GET /api/listings
+ export async function GET(req: Request) {
+   const url = new URL(req.url);
+   const q = url.searchParams.get("q") || "";
+@@ -8,16 +11,102 @@ export async function GET(req: Request) {
+   const escrow = url.searchParams.get("escrow") !== "0";
+ 
+   const where: any = { active: true };
+-  if (q) where.OR = [{ title: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }];
++  if (q) {
++    where.OR = [
++      { title: { contains: q, mode: "insensitive" } },
++      { description: { contains: q, mode: "insensitive" } },
++    ];
++  }
+   if (cat) where.category = { slug: cat };
+   if (escrow) where.escrowOnly = true;
+ 
+-  const listings = await db.listing.findMany({
++  const listings = await prisma.listing.findMany({
+     where,
+     take: 60,
+     orderBy: { createdAt: "desc" },
+-    include: { category: true, seller: { include: { sellerProfile: true } } }
++    include: {
++      category: true,
++      seller: { include: { sellerProfile: true } },
++      images: true,
++    },
+   });
+ 
+   return NextResponse.json({ listings });
+ }
++
++// POST /api/listings
++export async function POST(req: Request) {
++  try {
++    // 1) Récupérer la session (user connecté)
++    const session = await getServerSession(authOptions);
++
++    if (!session || !session.user || !(session.user as any).id) {
++      return NextResponse.json(
++        { error: "Not authenticated" },
++        { status: 401 }
++      );
++    }
++
++    const sellerId = (session.user as any).id as string;
++
++    // 2) Lire le body envoyé par le client
++    const body = await req.json();
++
++    const {
++      title,
++      description,
++      whatYouGet,
++      priceCents,
++      stock,
++      deliveryType,
++      imageUrl,
++    } = body;
++
++    // 3) Vérifier les champs obligatoires
++    if (!title || !description || !priceCents || !deliveryType) {
++      return NextResponse.json(
++        { error: "Missing required fields" },
++        { status: 400 }
++      );
++    }
++
++    // 4) Récupérer une category existante (par défaut)
++    const category = await prisma.category.findFirst();
++    if (!category) {
++      return NextResponse.json(
++        { error: "No category in DB" },
++        { status: 400 }
++      );
++    }
++
++    // 5) Créer l'annonce liée au user connecté
++    const listing = await prisma.listing.create({
++      data: {
++        sellerId, // <= ici : le compte connecté
++        categoryId: category.id,
++        title,
++        description,
++        whatYouGet,
++        priceCents,
++        stock: stock ?? 1,
++        deliveryType,
++        // currency et escrowOnly ont des valeurs par défaut dans Prisma
++        images: imageUrl
++          ? {
++              create: [{ url: imageUrl }],
++            }
++          : undefined,
++      },
++      include: {
++        category: true,
++        seller: { include: { sellerProfile: true } },
++        images: true,
++      },
++    });
++
++    return NextResponse.json({ listing }, { status: 201 });
++  } catch (e) {
++    console.error(e);
++    return NextResponse.json({ error: "Server error" }, { status: 500 });
++  }
++}
+diff --git a/app/api/orders/route.ts b/app/api/orders/route.ts
+index 0476cff..727de27 100644
+--- a/app/api/orders/route.ts
++++ b/app/api/orders/route.ts
+@@ -1,66 +1,70 @@
+-import { NextResponse } from "next/server";
+-import { db } from "@/lib/db";
+-import { platformFeeCents, makeSafeTradeCode } from "@/lib/policies";
+-import { requireUser } from "@/lib/auth";
+-import { createPaymentIntentForEscrow } from "@/lib/stripe";
++import { NextRequest, NextResponse } from "next/server";
++import { getServerSession } from "next-auth";
++import { authOptions } from "@/lib/auth";
++import { prisma } from "@/lib/prisma";
+ 
+-export async function POST(req: Request) {
+-  let user;
+-  try {
+-    user = await requireUser();
+-  } catch {
+-    return NextResponse.json({ error: "Login required" }, { status: 401 });
++function generateSafeTradeCode() {
++  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
++  let out = "D2D-";
++  for (let i = 0; i < 6; i++) {
++    out += chars[Math.floor(Math.random() * chars.length)];
++  }
++  return out;
++}
++
++export async function POST(req: NextRequest) {
++  const session = await getServerSession(authOptions);
++  if (!session || !session.user?.id) {
++    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+   }
+ 
+-  const body = await req.json();
+-  const { listingId, quantity = 1 } = body;
++  const buyerId = session.user.id as string;
+ 
+-  const listing = await db.listing.findUnique({ where: { id: listingId }, include: { seller: { include: { sellerProfile: true } } } });
+-  if (!listing || !listing.active) return NextResponse.json({ error: "Listing not found" }, { status: 404 });
++  const body = await req.json().catch(() => null);
++  if (!body || !body.listingId) {
++    return NextResponse.json({ error: "listingId is required" }, { status: 400 });
++  }
++
++  const quantity = body.quantity && body.quantity > 0 ? body.quantity : 1;
+ 
+-  const sellerProfile = listing.seller.sellerProfile;
+-  if (!sellerProfile) return NextResponse.json({ error: "Seller not enabled" }, { status: 400 });
++  const listing = await prisma.listing.findUnique({
++    where: { id: body.listingId },
++  });
+ 
+-  const subtotal = listing.priceCents * quantity;
+-  const fee = platformFeeCents(subtotal);
+-  const total = subtotal; // show fee included or separate in UI
++  if (!listing) {
++    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
++  }
+ 
+-  if (listing.priceCents > sellerProfile.maxPriceCents) {
+-    return NextResponse.json({ error: "Seller trust too low for this price cap" }, { status: 403 });
++  if (listing.sellerId === buyerId) {
++    return NextResponse.json(
++      { error: "Tu ne peux pas acheter ta propre annonce." },
++      { status: 400 }
++    );
+   }
+ 
+-  const now = new Date();
+-  const disputeHours = 48;
+-  const buyerDisputeDeadline = new Date(now.getTime() + disputeHours * 60 * 60 * 1000);
+-  const safeTradeCode = makeSafeTradeCode();
++  const unitPriceCents = listing.priceCents;
++  const subtotalCents = unitPriceCents * quantity;
++  const platformFeeCents = Math.round(subtotalCents * 0.1);
++  const totalCents = subtotalCents + platformFeeCents;
++
++  const safeTradeCode = generateSafeTradeCode();
++  const buyerDisputeDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000);
+ 
+-  const order = await db.order.create({
++  const order = await prisma.order.create({
+     data: {
+-      buyerId: user.id,
++      buyerId,
+       sellerId: listing.sellerId,
+       listingId: listing.id,
+       quantity,
+-      unitPriceCents: listing.priceCents,
+-      subtotalCents: subtotal,
+-      platformFeeCents: fee,
+-      totalCents: total,
+-      status: "AWAITING_SELLER_ACCEPT",
++      unitPriceCents,
++      subtotalCents,
++      platformFeeCents,
++      totalCents,
++      status: "PAID",
+       safeTradeCode,
+       buyerDisputeDeadline,
+     },
+   });
+ 
+-  const pi = await createPaymentIntentForEscrow({
+-    orderId: order.id,
+-    amountCents: total,
+-    currency: listing.currency,
+-    buyerEmail: user.email ?? undefined,
+-  });
+-
+-  await db.order.update({
+-    where: { id: order.id },
+-    data: { stripePaymentIntentId: pi.id, escrowFundedAt: new Date(), status: "PAID" },
+-  });
+-
+-  return NextResponse.json({ orderId: order.id, clientSecret: (pi as any).client_secret ?? null });
++  return NextResponse.json({ order });
+ }
+diff --git a/app/globals.css b/app/globals.css
+index f75b6b7..67a2525 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -2,594 +2,574 @@
+ @tailwind components;
+ @tailwind utilities;
+ 
++
+ /* ============================================================
+-   Donut2Donut — Premium 2025 Design System (Light + Blue)
++   Donut2Donut — 2025 Global Styles (Bright Glass / Blue)
++   Images supported:
++   - /donut1.jpg (logo)
++   - /donut2.png (crystal glow)
++   - /donut3.png (hero/backdrop)
+    ============================================================ */
+ 
+-:root {
+-  --bg: #f5f8ff;
+-  --bg-strong: #eef3fb;
+-  --surface: #ffffff;
+-  --surface-muted: #f8faff;
+-  --border: #e1e7f3;
+-  --border-strong: #d2dced;
+-
+-  --text: #0f172a;
+-  --text-muted: #4b5563;
+-
+-  --primary: #2563eb;
+-  --primary-dark: #1d4ed8;
+-  --accent: #0ea5e9;
+-
+-  --shadow-xs: 0 2px 12px rgba(15, 23, 42, 0.06);
+-  --shadow-sm: 0 6px 24px rgba(15, 23, 42, 0.08);
+-  --shadow-md: 0 16px 40px rgba(15, 23, 42, 0.12);
+-  --focus: 0 0 0 3px rgba(37, 99, 235, 0.18);
+-
+-  --radius-sm: 10px;
+-  --radius-md: 14px;
+-  --radius-lg: 20px;
+-  --radius-xl: 28px;
+ 
+-  --max: 1180px;
+-  --nav-height: 72px;
+-}
+-
+-* {
+-  box-sizing: border-box;
+-}
+-
+-html,
+-body {
+-  height: 100%;
+-}
++/* -----------------------------
++   0) Design Tokens
++   ----------------------------- */
++:root {
++  /* Background (lifted so it’s readable) */
++  --bg0: #0b1430;
++  --bg1: #0d1736;
++  --bg2: #101d44;
++
++  /* Text (bright) */
++  --txt0: rgba(255, 255, 255, 0.98);
++  --txt1: rgba(255, 255, 255, 0.90);
++  --txt2: rgba(255, 255, 255, 0.76);
++
++  /* Glass (brighter) */
++  --glass0: rgba(255, 255, 255, 0.10);
++  --glass1: rgba(255, 255, 255, 0.16);
++  --glass2: rgba(255, 255, 255, 0.22);
++
++  /* Borders (visible) */
++  --stroke0: rgba(255, 255, 255, 0.22);
++  --stroke1: rgba(255, 255, 255, 0.34);
++  --stroke2: rgba(255, 255, 255, 0.46);
++
++  /* Brand */
++  --b0: #eaf3ff;
++  --b1: #cbe4ff;
++  --b2: #98c9ff;
++  --b3: #2a7bff;
++  --b4: #1b56d6;
++
++  /* Accents */
++  --vio3: #7c5cff;
++  --teal3: #22d3ee;
++
++  /* Radius */
++  --r10: 10px;
++  --r14: 14px;
++  --r18: 18px;
++  --r24: 24px;
++  --r30: 30px;
++
++  /* Shadows */
++  --shSoft: 0 18px 60px rgba(0, 0, 0, 0.35);
++  --shPop: 0 22px 80px rgba(0, 0, 0, 0.45);
++  --shGlow: 0 0 0 1px rgba(42, 123, 255, 0.26), 0 0 90px rgba(42, 123, 255, 0.24);
++  --focus: 0 0 0 3px rgba(42, 123, 255, 0.44);
++
++  /* Layout */
++  --max: 1220px;
++}
++
++
++/* -----------------------------
++   1) Base Reset
++   ----------------------------- */
++* { box-sizing: border-box; }
++html, body { height: 100%; }
+ 
+ body {
+   margin: 0;
+-  color: var(--text);
+-  background: radial-gradient(1200px 500px at 50% -10%, #eaf1ff, transparent 60%),
+-    linear-gradient(180deg, var(--bg), #ffffff 40%, var(--bg) 100%);
++  color: var(--txt0);
++  background:
++    radial-gradient(1200px 700px at 18% -12%, rgba(42,123,255,0.34), transparent 60%),
++    radial-gradient(1050px 650px at 86% 0%, rgba(124,92,255,0.28), transparent 62%),
++    radial-gradient(900px 620px at 55% 115%, rgba(34,211,238,0.16), transparent 64%),
++    linear-gradient(180deg, var(--bg0), var(--bg2));
+   -webkit-font-smoothing: antialiased;
+   text-rendering: optimizeLegibility;
+ }
+ 
+-a {
+-  color: inherit;
+-  text-decoration: none;
+-}
+-
+-img {
+-  max-width: 100%;
+-  display: block;
+-}
++a { color: inherit; text-decoration: none; }
++img { max-width: 100%; display: block; }
++button, input, select, textarea { font: inherit; color: inherit; }
+ 
+-button,
+-input,
+-select,
+-textarea {
+-  font: inherit;
+-  color: inherit;
+-}
+-
+-::selection {
+-  background: rgba(37, 99, 235, 0.18);
+-}
++::selection { background: rgba(42, 123, 255, 0.35); }
+ 
+ @media (prefers-reduced-motion: reduce) {
+-  *,
+-  *::before,
+-  *::after {
++  *, *::before, *::after {
+     animation: none !important;
+     transition: none !important;
+     scroll-behavior: auto !important;
+   }
+ }
+ 
+-/* Layout */
+-.app-shell {
+-  min-height: 100dvh;
+-  display: flex;
+-  flex-direction: column;
+-}
+-
+-.app-content {
+-  flex: 1;
+-  padding-top: var(--nav-height);
+-}
+ 
++/* -----------------------------
++   2) Scrollbar
++   ----------------------------- */
++*::-webkit-scrollbar { width: 10px; height: 10px; }
++*::-webkit-scrollbar-track { background: rgba(255,255,255,0.07); border-radius: 999px; }
++*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); border-radius: 999px; }
++*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.30); }
++
++
++/* -----------------------------
++   3) App Shell Layers
++   ----------------------------- */
++.app-shell { min-height: 100dvh; position: relative; }
++
++.app-noise {
++  pointer-events: none;
++  position: fixed;
++  inset: 0;
++  opacity: 0.045;
++  mix-blend-mode: overlay;
++  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
++}
++
++.app-backdrop {
++  pointer-events: none;
++  position: fixed;
++  inset: -40px;
++  background-image: url("/donut3.png");
++  background-size: cover;
++  background-position: center;
++  filter: blur(16px) saturate(1.10) brightness(0.78);
++  opacity: 0.12;
++  transform: scale(1.08);
++}
++
++.app-crystal {
++  pointer-events: none;
++  position: fixed;
++  right: -120px;
++  top: -120px;
++  width: 440px;
++  height: 440px;
++  background-image: url("/donut2.png");
++  background-size: cover;
++  background-position: center;
++  opacity: 0.16;
++  filter: drop-shadow(0 0 90px rgba(42,123,255,0.30));
++  transform: rotate(8deg);
++}
++
++
++/* -----------------------------
++   4) Layout Utilities
++   ----------------------------- */
+ .container {
+   width: 100%;
+   max-width: var(--max);
+   margin: 0 auto;
+-  padding: 0 24px;
+-}
+-
+-.section {
+-  padding: 80px 0;
+-}
+-
+-.section-tight {
+-  padding: 52px 0;
+-}
+-
+-.section-muted {
+-  background: var(--bg-strong);
++  padding: 0 18px;
+ }
+ 
+-.grid-2 {
+-  display: grid;
+-  gap: 28px;
+-}
++.section { padding: 24px 0; }
++.section-tight { padding: 16px 0; }
+ 
+-.grid-3 {
+-  display: grid;
+-  gap: 22px;
+-}
++.stack-4 { display: grid; gap: 4px; }
++.stack-6 { display: grid; gap: 6px; }
++.stack-8 { display: grid; gap: 8px; }
++.stack-10 { display: grid; gap: 10px; }
++.stack-14 { display: grid; gap: 14px; }
++.stack-18 { display: grid; gap: 18px; }
+ 
+ .grid-cards {
+   display: grid;
+-  gap: 18px;
+   grid-template-columns: repeat(1, minmax(0, 1fr));
++  gap: 14px;
+ }
+-
+-@media (min-width: 860px) {
+-  .grid-2 {
+-    grid-template-columns: repeat(2, minmax(0, 1fr));
+-  }
+-
+-  .grid-3 {
+-    grid-template-columns: repeat(3, minmax(0, 1fr));
+-  }
+-
+-  .grid-cards {
+-    grid-template-columns: repeat(2, minmax(0, 1fr));
+-  }
+-}
+-
+-@media (min-width: 1100px) {
+-  .grid-cards {
+-    grid-template-columns: repeat(3, minmax(0, 1fr));
+-  }
+-}
+-
+-.stack-6 {
+-  display: grid;
+-  gap: 6px;
++@media (min-width: 640px) {
++  .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ }
+-
+-.stack-8 {
+-  display: grid;
+-  gap: 8px;
++@media (min-width: 1024px) {
++  .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+ }
+-
+-.stack-10 {
+-  display: grid;
+-  gap: 10px;
++@media (min-width: 1280px) {
++  .grid-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+ }
+ 
+-.stack-12 {
+-  display: grid;
+-  gap: 12px;
+-}
+-
+-.stack-16 {
+-  display: grid;
+-  gap: 16px;
+-}
++.sticky { position: sticky; top: 88px; }
+ 
+-.stack-20 {
+-  display: grid;
+-  gap: 20px;
++/* A bright wrapper you can use for “dark sections” */
++.section-glow {
++  position: relative;
++  border-radius: var(--r30);
++  padding: 18px;
++  background:
++    radial-gradient(900px 520px at 20% 10%, rgba(42,123,255,0.26), transparent 60%),
++    radial-gradient(760px 520px at 85% 0%, rgba(124,92,255,0.20), transparent 62%),
++    rgba(255,255,255,0.04);
++  border: 1px solid rgba(255,255,255,0.18);
++  box-shadow: 0 20px 70px rgba(0,0,0,0.32);
+ }
+ 
+-.stack-24 {
+-  display: grid;
+-  gap: 24px;
+-}
+ 
+-/* Typography */
++/* -----------------------------
++   5) Typography
++   ----------------------------- */
+ .h1 {
+-  font-size: clamp(2.2rem, 4.8vw, 3.5rem);
+-  line-height: 1.08;
+-  font-weight: 700;
++  font-size: clamp(2.25rem, 4.1vw, 3.35rem);
++  line-height: 1.05;
++  font-weight: 950;
+   letter-spacing: -0.03em;
++  color: var(--txt0);
++  text-shadow: 0 14px 60px rgba(0,0,0,0.40);
+ }
+-
+ .h2 {
+-  font-size: clamp(1.4rem, 3vw, 2rem);
+-  line-height: 1.2;
+-  font-weight: 650;
+-  letter-spacing: -0.02em;
++  font-size: clamp(1.25rem, 2.0vw, 1.65rem);
++  line-height: 1.14;
++  font-weight: 900;
++  letter-spacing: -0.015em;
++  color: var(--txt0);
+ }
+-
+ .h3 {
+   font-size: 1.08rem;
+-  line-height: 1.45;
+-  font-weight: 600;
+-}
+-
+-.p {
+-  color: var(--text-muted);
+-  line-height: 1.6;
++  line-height: 1.25;
++  font-weight: 850;
++  color: var(--txt0);
+ }
++.p { color: var(--txt1); line-height: 1.62; }
++.muted { color: var(--txt2); }
+ 
+ .kicker {
+-  font-size: 0.72rem;
+-  letter-spacing: 0.22em;
++  font-size: 0.78rem;
++  letter-spacing: 0.14em;
+   text-transform: uppercase;
+-  color: #64748b;
++  color: rgba(255,255,255,0.82);
+ }
+ 
+-.muted {
+-  color: var(--text-muted);
+-}
+ 
+-/* Navigation */
+-.navbar {
+-  position: sticky;
+-  top: 0;
+-  z-index: 50;
+-  height: var(--nav-height);
+-  display: flex;
+-  align-items: center;
+-  background: rgba(255, 255, 255, 0.88);
+-  backdrop-filter: blur(14px);
+-  border-bottom: 1px solid transparent;
+-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+-}
+-
+-.navbar.scrolled {
+-  border-color: var(--border);
+-  box-shadow: var(--shadow-xs);
+-  background: rgba(255, 255, 255, 0.96);
+-}
+-
+-.nav-inner {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  gap: 16px;
+-  width: 100%;
+-}
+-
+-.nav-logo {
+-  font-weight: 700;
+-  letter-spacing: -0.02em;
+-  display: flex;
+-  align-items: center;
+-  gap: 10px;
+-}
+-
+-.nav-links {
+-  display: none;
+-  gap: 8px;
+-  align-items: center;
+-}
+-
+-.nav-link {
+-  padding: 8px 14px;
+-  border-radius: 999px;
+-  font-size: 0.95rem;
+-  color: var(--text-muted);
+-  transition: background 0.2s ease, color 0.2s ease;
+-}
+-
+-.nav-link:hover,
+-.nav-link.active {
+-  color: var(--text);
+-  background: var(--bg-strong);
++/* -----------------------------
++   6) Surfaces
++   ----------------------------- */
++.surface {
++  background: linear-gradient(
++    180deg,
++    rgba(255,255,255,0.22),
++    rgba(255,255,255,0.12)
++  );
++  border: 1px solid rgba(255,255,255,0.28);
++  border-radius: var(--r24);
++  box-shadow: var(--shSoft);
+ }
+ 
+-.nav-actions {
+-  display: flex;
+-  gap: 10px;
+-  align-items: center;
++.surface-strong {
++  background: linear-gradient(
++    180deg,
++    rgba(255,255,255,0.30),
++    rgba(255,255,255,0.16)
++  );
++  border: 1px solid rgba(255,255,255,0.38);
++  border-radius: var(--r24);
++  box-shadow: var(--shPop);
+ }
+ 
+-@media (min-width: 860px) {
+-  .nav-links {
+-    display: flex;
+-  }
++.glass {
++  backdrop-filter: blur(14px);
++  -webkit-backdrop-filter: blur(14px);
+ }
+ 
+-/* Buttons */
++.border-grad { position: relative; }
++.border-grad::before {
++  content: "";
++  position: absolute;
++  inset: -1px;
++  border-radius: inherit;
++  padding: 1px;
++  background: linear-gradient(
++    135deg,
++    rgba(42,123,255,0.62),
++    rgba(124,92,255,0.34),
++    rgba(34,211,238,0.26)
++  );
++  -webkit-mask:
++    linear-gradient(#000 0 0) content-box,
++    linear-gradient(#000 0 0);
++  -webkit-mask-composite: xor;
++  mask-composite: exclude;
++  pointer-events: none;
++  opacity: 0.88;
++}
++
++
++/* -----------------------------
++   7) Buttons
++   ----------------------------- */
+ .btn {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+-  gap: 0.5rem;
++  gap: 0.55rem;
+   height: 44px;
+-  padding: 0 18px;
+-  border-radius: var(--radius-md);
+-  font-weight: 600;
+-  border: 1px solid transparent;
+-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease,
+-    color 0.2s ease, border-color 0.2s ease;
+-}
+-
+-.btn:active {
+-  transform: translateY(1px);
++  padding: 0 14px;
++  border-radius: var(--r14);
++  font-weight: 850;
++  letter-spacing: -0.01em;
++  user-select: none;
++  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+ }
++.btn:active { transform: translateY(1px) scale(0.992); }
+ 
+ .btn-primary {
+-  background: var(--primary);
+-  color: #ffffff;
+-  box-shadow: var(--shadow-sm);
+-}
+-
+-.btn-primary:hover {
+-  background: var(--primary-dark);
+-  box-shadow: var(--shadow-md);
+-}
+-
+-.btn-secondary {
+-  background: #ffffff;
+-  border-color: var(--border-strong);
+-  color: var(--text);
+-}
+-
+-.btn-secondary:hover {
+-  border-color: var(--primary);
+-  color: var(--primary);
++  background: linear-gradient(180deg, var(--b3), var(--b4));
++  box-shadow: 0 16px 52px rgba(42,123,255,0.34);
++  border: 1px solid rgba(255,255,255,0.16);
+ }
++.btn-primary:hover { filter: brightness(1.10); box-shadow: var(--shGlow); }
+ 
+ .btn-ghost {
+-  background: var(--bg-strong);
+-  border-color: transparent;
+-  color: var(--text);
+-}
+-
+-.btn-ghost:hover {
+-  background: #e6eefb;
++  background: rgba(255,255,255,0.12);
++  border: 1px solid rgba(255,255,255,0.22);
+ }
++.btn-ghost:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.30); }
+ 
+ .btn-soft {
+-  background: rgba(37, 99, 235, 0.08);
+-  border-color: rgba(37, 99, 235, 0.18);
+-  color: var(--primary);
++  background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.12));
++  border: 1px solid rgba(255,255,255,0.22);
+ }
++.btn-soft:hover { background: linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0.12)); }
+ 
+-.btn-soft:hover {
+-  background: rgba(37, 99, 235, 0.12);
+-}
++.btn-wide { width: 100%; }
++.btn-icon { width: 44px; padding: 0; border-radius: var(--r14); }
+ 
+-.btn-wide {
+-  width: 100%;
+-}
+ 
+-/* Inputs */
+-.input,
+-.select,
+-.textarea {
++/* -----------------------------
++   8) Inputs
++   ----------------------------- */
++.input {
+   width: 100%;
+-  border-radius: var(--radius-md);
+-  border: 1px solid var(--border);
+-  background: #ffffff;
+-  padding: 12px 14px;
+-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+-}
+-
+-.input:focus,
+-.select:focus,
+-.textarea:focus {
++  height: 44px;
++  padding: 0 12px;
++  border-radius: var(--r14);
++  background: rgba(255,255,255,0.16);
++  border: 1px solid rgba(255,255,255,0.26);
+   outline: none;
+-  border-color: var(--primary);
+-  box-shadow: var(--focus);
+-}
+-
+-.input::placeholder {
+-  color: #94a3b8;
+-}
+-
+-/* Cards */
+-.card {
+-  border-radius: var(--radius-lg);
+-  border: 1px solid var(--border);
+-  background: var(--surface);
+-  box-shadow: var(--shadow-sm);
++  transition: box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+ }
+-
+-.card-hover {
+-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+-}
+-
+-.card-hover:hover {
+-  transform: translateY(-2px);
+-  border-color: rgba(37, 99, 235, 0.35);
+-  box-shadow: var(--shadow-md);
++.input::placeholder { color: rgba(255,255,255,0.62); }
++.input:focus {
++  border-color: rgba(42,123,255,0.75);
++  box-shadow: var(--focus);
++  background: rgba(255,255,255,0.18);
+ }
+ 
+-.card-media {
+-  border-bottom: 1px solid var(--border);
+-  background: var(--surface-muted);
+-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+-  overflow: hidden;
++.select {
++  appearance: none;
++  background-image:
++    linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.75) 50%),
++    linear-gradient(135deg, rgba(255,255,255,0.75) 50%, transparent 50%);
++  background-position:
++    calc(100% - 18px) 18px,
++    calc(100% - 12px) 18px;
++  background-size: 6px 6px, 6px 6px;
++  background-repeat: no-repeat;
++  padding-right: 34px;
+ }
+ 
+-.card-body {
+-  padding: 20px;
+-}
+ 
+-/* Badges */
++/* -----------------------------
++   9) Badges
++   ----------------------------- */
+ .badge {
+   display: inline-flex;
+   align-items: center;
+-  gap: 6px;
++  gap: 0.4rem;
++  padding: 0.34rem 0.62rem;
+   border-radius: 999px;
+-  border: 1px solid var(--border);
+-  padding: 4px 10px;
+-  font-size: 0.75rem;
+-  color: #334155;
+-  background: var(--surface-muted);
++  border: 1px solid rgba(255,255,255,0.22);
++  background: rgba(255,255,255,0.12);
++  font-size: 0.72rem;
++  font-weight: 850;
++  color: var(--txt1);
+ }
++.badge-blue { color: var(--b1); }
++.badge-good { color: rgba(34,197,94,0.98); }
+ 
+-.badge-primary,
+-.badge-blue {
+-  color: var(--primary);
+-  border-color: rgba(37, 99, 235, 0.2);
+-  background: rgba(37, 99, 235, 0.08);
+-}
+ 
+-.badge-accent {
+-  color: #0284c7;
+-  border-color: rgba(14, 165, 233, 0.25);
+-  background: rgba(14, 165, 233, 0.08);
++/* -----------------------------
++   10) Cards
++   ----------------------------- */
++.card {
++  border-radius: var(--r24);
++  border: 1px solid rgba(255,255,255,0.26);
++  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.10));
++  box-shadow: var(--shSoft);
++  overflow: hidden;
+ }
+-
+-.badge-good {
+-  color: #0f766e;
+-  border-color: rgba(13, 148, 136, 0.25);
+-  background: rgba(13, 148, 136, 0.08);
++.card-hover {
++  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+ }
+-
+-.badge-warn {
+-  color: #b45309;
+-  border-color: rgba(245, 158, 11, 0.3);
+-  background: rgba(245, 158, 11, 0.12);
++.card-hover:hover {
++  transform: translateY(-2px);
++  border-color: rgba(42,123,255,0.45);
++  box-shadow: var(--shGlow);
+ }
+ 
+-.ring-glow {
+-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
++.card-img {
++  position: relative;
++  overflow: hidden;
++  border-bottom: 1px solid rgba(255,255,255,0.18);
++  background: rgba(255,255,255,0.10);
+ }
+-
+-/* Hero */
+-.hero {
+-  border-radius: var(--radius-xl);
+-  background: var(--surface);
+-  border: 1px solid var(--border);
+-  box-shadow: var(--shadow-md);
++.card-img img {
++  width: 100%;
++  height: 180px;
++  object-fit: cover;
++  transform: scale(1);
++  transition: transform 0.24s ease;
+ }
++.card-hover:hover .card-img img { transform: scale(1.05); }
+ 
+-.hero-grid {
+-  display: grid;
+-  gap: 32px;
+-}
+ 
+-@media (min-width: 980px) {
+-  .hero-grid {
+-    grid-template-columns: 1fr 0.9fr;
+-    align-items: center;
+-  }
+-}
++/* -----------------------------
++   11) Hero
++   ----------------------------- */
++.hero { position: relative; overflow: hidden; border-radius: var(--r30); }
+ 
+-.hero-visual {
+-  border-radius: var(--radius-lg);
+-  background: var(--surface-muted);
+-  border: 1px solid var(--border);
+-  padding: 16px;
++.hero::before {
++  content: "";
++  position: absolute;
++  inset: 0;
++  background-image: url("/donut3.png");
++  background-size: cover;
++  background-position: center;
++  filter: blur(12px) saturate(1.10) brightness(0.92);
++  transform: scale(1.08);
++  opacity: 0.92;
++  pointer-events: none;
++  z-index: 0;
++}
++
++.hero::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  background:
++    radial-gradient(980px 560px at 18% 0%, rgba(42,123,255,0.36), transparent 60%),
++    radial-gradient(820px 520px at 82% 12%, rgba(124,92,255,0.28), transparent 56%),
++    linear-gradient(180deg, rgba(10,18,44,0.06), rgba(10,18,44,0.22));
++  pointer-events: none;
++  z-index: 1;
++}
++
++.hero-inner {
++  position: relative;
++  z-index: 3;
++  padding: 18px;
++  min-height: 260px;
+   display: grid;
+-  place-items: center;
+-}
+-
+-.hero-visual img {
+-  width: 100%;
+-  height: auto;
+-  border-radius: var(--radius-md);
++  gap: 12px;
+ }
+ 
+-/* Social proof */
+-.social-strip {
+-  display: grid;
+-  gap: 16px;
+-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+-  background: var(--surface);
+-  border: 1px solid var(--border);
+-  border-radius: var(--radius-lg);
+-  padding: 18px;
+-}
++.crystal-glow {
++  position: absolute;
++  right: -60px;
++  top: -60px;
++  width: 320px;
++  height: 320px;
++  background-image: url("/donut2.png");
++  background-size: cover;
++  background-position: center;
++  opacity: 0.46;
++  filter: drop-shadow(0 0 70px rgba(42,123,255,0.55));
++  transform: rotate(10deg);
++  pointer-events: none;
++  z-index: 2;
++}
++
++
++/* -----------------------------
++   12) Misc
++   ----------------------------- */
++.sep { height: 1px; background: rgba(255,255,255,0.18); margin: 12px 0; }
+ 
+-/* Footer */
+-.footer {
+-  border-top: 1px solid var(--border);
+-  background: #ffffff;
++@keyframes shimmer {
++  0% { background-position: -540px 0; }
++  100% { background-position: 540px 0; }
+ }
+-
+-.footer-inner {
+-  display: flex;
+-  flex-direction: column;
+-  gap: 10px;
+-  padding: 28px 0;
+-  color: #64748b;
+-  font-size: 0.85rem;
++.skel {
++  background: linear-gradient(90deg, rgba(255,255,255,0.14), rgba(255,255,255,0.26), rgba(255,255,255,0.14));
++  background-size: 980px 100%;
++  animation: shimmer 1.20s infinite linear;
++  border-radius: var(--r14);
+ }
+ 
+-.footer-links {
+-  display: flex;
+-  flex-wrap: wrap;
+-  gap: 16px;
++@keyframes fadeUp {
++  from { opacity: 0; transform: translateY(10px); }
++  to   { opacity: 1; transform: translateY(0); }
+ }
++.fade-up { animation: fadeUp .22s ease both; }
+ 
+-/* Utility */
+-.skip-link {
+-  position: absolute;
+-  left: -999px;
+-  top: auto;
+-  width: 1px;
+-  height: 1px;
+-  overflow: hidden;
++@keyframes pop {
++  0% { transform: scale(.98); opacity: 0; }
++  100% { transform: scale(1); opacity: 1; }
+ }
++.pop { animation: pop .18s ease both; }
+ 
+-.skip-link:focus {
+-  position: static;
+-  width: auto;
+-  height: auto;
+-  padding: 8px 12px;
+-  background: var(--primary);
+-  color: #fff;
+-  border-radius: var(--radius-sm);
++@layer utilities {
++  .text-muted { color: var(--txt2); }
++  .ring-glow { box-shadow: var(--shGlow); }
+ }
+ 
+-.fade-up {
+-  animation: fadeUp 0.35s ease both;
+-}
+ 
+-@keyframes fadeUp {
+-  from {
+-    opacity: 0;
+-    transform: translateY(12px);
+-  }
+-  to {
+-    opacity: 1;
+-    transform: translateY(0);
+-  }
++/* -----------------------------
++   13) Listing pages
++   ----------------------------- */
++.listing-page section,
++.listing-page .block,
++.listing-page .panel {
++  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.12));
++  border: 1px solid rgba(255,255,255,0.26);
++  border-radius: var(--r24);
+ }
+ 
+-.skel {
+-  background: linear-gradient(90deg, #eef2ff, #f9fbff, #eef2ff);
+-  background-size: 900px 100%;
+-  animation: shimmer 1.2s infinite linear;
+-  border-radius: var(--radius-md);
+-}
+ 
+-@keyframes shimmer {
+-  0% {
+-    background-position: -600px 0;
+-  }
+-  100% {
+-    background-position: 600px 0;
+-  }
++/* -----------------------------
++   14) Fix select visibility (glass + transparent)
++   ----------------------------- */
++select.input {
++  color: var(--txt0);
++  background: rgba(255,255,255,0.16);
++  border: 1px solid rgba(255,255,255,0.26);
+ }
+ 
+-/* Legacy helpers */
+-.surface {
+-  background: var(--surface);
+-  border: 1px solid var(--border);
+-  border-radius: var(--radius-lg);
+-  box-shadow: var(--shadow-sm);
++select.input option {
++  color: #e5e7eb;
++  background-color: #020617;
+ }
+ 
+-.surface-strong {
+-  background: var(--surface);
+-  border: 1px solid var(--border-strong);
+-  border-radius: var(--radius-lg);
+-  box-shadow: var(--shadow-md);
+-}
+ 
+-.glass {
+-  background: rgba(255, 255, 255, 0.9);
+-  backdrop-filter: blur(12px);
++/* 15) Dropdown de recherche pour items */
++.dropdown-panel {
++  position: absolute;
++  z-index: 20;
++  top: 48px;                 /* juste sous un input de 44px */
++  left: 0;
++  right: 0;
++  max-height: 260px;
++  overflow-y: auto;
++
++  border-radius: var(--r14);
++  background: linear-gradient(
++    180deg,
++    rgba(255,255,255,0.22),
++    rgba(255,255,255,0.10)
++  );
++  border: 1px solid rgba(255,255,255,0.26);
++  box-shadow: var(--shSoft);
++  backdrop-filter: blur(14px);
++  -webkit-backdrop-filter: blur(14px);
+ }
+ 
+-.border-grad {
+-  border: 1px solid var(--border-strong);
++.dropdown-item {
++  width: 100%;
++  text-align: left;
++  padding: 6px 10px;
++  font-size: 13px;
++  background: transparent;
++  border: none;
++  color: var(--txt1);
++  cursor: pointer;
++  transition: background 0.16s ease, color 0.16s ease;
++}
++
++.dropdown-item:hover {
++  background: rgba(255,255,255,0.14);
++  color: var(--txt0);
+ }
+diff --git a/app/layout.tsx b/app/layout.tsx
+index f4b64eb..61bbea7 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
+ import "./globals.css";
+ import Navbar from "../components/Navbar";
+ import Providers from "./providers";
+-import Footer from "../components/Footer";
+ 
+ export const metadata: Metadata = {
+   title: "Donut2Donut — Secure DonutSMP Marketplace",
+@@ -15,12 +14,13 @@ export const metadata: Metadata = {
+     description: "Escrow-first trading with proof + disputes. Built to stop scams.",
+     images: ["/donut3.png"],
+     type: "website",
++
++    
+   },
+ };
+-
+ export const viewport: Viewport = {
+-  themeColor: "#f7f9fc",
+-  colorScheme: "light",
++  themeColor: "#0b1220",
++  colorScheme: "dark",
+   width: "device-width",
+   initialScale: 1,
+ };
+@@ -35,14 +35,87 @@ export default function RootLayout({
+       <body>
+         <Providers>
+           <div className="app-shell">
++            {/* base backdrops (keep your existing assets) */}
++            <div
++              className="app-backdrop"
++              aria-hidden="true"
++              style={{
++                backgroundImage: "url(/donut3.png)",
++                backgroundSize: "cover",
++                backgroundPosition: "center",
++                filter: "blur(20px) saturate(1.08) contrast(1.06)",
++                opacity: 0.18,
++                transform: "scale(1.12)",
++                pointerEvents: "none",
++              }}
++            />
++            <div
++              className="app-crystal"
++              aria-hidden="true"
++              style={{
++                backgroundImage: "url(/donut2.png)",
++                backgroundRepeat: "no-repeat",
++                backgroundPosition: "85% 10%",
++                backgroundSize: "720px auto",
++                opacity: 0.22,
++                mixBlendMode: "screen",
++                filter: "saturate(1.15) contrast(1.05)",
++                pointerEvents: "none",
++              }}
++            />
++
++            {/* stronger depth: corner glows + vignette */}
++            <div
++              aria-hidden="true"
++              style={{
++                position: "fixed",
++                inset: 0,
++                pointerEvents: "none",
++                background: `
++                  radial-gradient(900px 520px at 12% 12%, rgba(120,220,255,0.14), transparent 60%),
++                  radial-gradient(900px 520px at 88% 18%, rgba(120,170,255,0.12), transparent 62%),
++                  radial-gradient(900px 640px at 70% 92%, rgba(120,220,255,0.10), transparent 64%),
++                  linear-gradient(180deg, rgba(7,11,20,0.10), rgba(7,11,20,0.62))
++                `,
++              }}
++            />
++
++            {/* subtle grain/noise */}
++            <div className="app-noise" aria-hidden="true" style={{ pointerEvents: "none" }} />
++
++            {/* extra vignette */}
++            <div
++              aria-hidden="true"
++              style={{
++                position: "fixed",
++                inset: 0,
++                pointerEvents: "none",
++                background:
++                  "radial-gradient(1200px 800px at 50% 30%, transparent 55%, rgba(0,0,0,0.55) 100%)",
++                opacity: 0.55,
++              }}
++            />
++
++            {/* skip link */}
+             <a className="skip-link" href="#content">
+               Skip to content
+             </a>
++
++            {/* navbar */}
+             <Navbar />
++
++            {/* page */}
+             <main id="content" className="app-content">
+               {children}
+             </main>
+-            <Footer />
++
++            {/* footer */}
++            <footer className="footer">
++              <div className="footer-inner">
++                <span>© {new Date().getFullYear()} Donut2Donut</span>
++                <span>Escrow • Proof • Disputes</span>
++              </div>
++            </footer>
+           </div>
+         </Providers>
+       </body>
+diff --git a/app/login/page.tsx b/app/login/page.tsx
+index b05aaf0..670f33f 100644
+--- a/app/login/page.tsx
++++ b/app/login/page.tsx
+@@ -17,40 +17,71 @@ export default function LoginPage() {
+ 
+   return (
+     <div className="container section" style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+-      <div className="card" style={{ padding: 28, maxWidth: 420, width: "100%" }}>
+-        <div className="stack-16">
++      <div
++        className="surface surface-strong glass border-grad"
++        style={{ padding: 24, maxWidth: 420, width: "100%" }}
++      >
++        <div className="stack-10">
++          {/* Titre */}
+           <div>
+             <div className="h2" style={{ marginBottom: 4 }}>
+-              Sign in
++              Connexion
+             </div>
+-            <div className="p" style={{ fontSize: 14 }}>
+-              Continue with Discord to access Donut2Donut.
++            <div className="p" style={{ fontSize: 14, color: "#8b8b8b" }}>
++              Connecte-toi avec Discord pour accéder au site.
+             </div>
+           </div>
+ 
++          {/* Erreur éventuelle */}
+           {error ? (
+             <div
+               className="p"
+               style={{
+                 fontSize: 13,
+                 color: "#b91c1c",
+-                backgroundColor: "#fee2e2",
+-                border: "1px solid #fecaca",
+-                borderRadius: 8,
+-                padding: "8px 10px",
++                backgroundColor: "#FEE2E2",
++                border: "1px solid #FCA5A5",
++                borderRadius: 6,
++                padding: "6px 10px",
+               }}
+             >
+-              Something went wrong during sign in. Try again.
++              Une erreur est survenue pendant la connexion. Réessaie.
+             </div>
+           ) : null}
+ 
+-          <button className="btn btn-primary btn-wide" onClick={() => signIn("discord", { callbackUrl: "/" })}>
+-            Continue with Discord
++          {/* Bouton Discord */}
++          <button
++            className="btn btn-primary"
++            style={{
++              width: "100%",
++              justifyContent: "center",
++              display: "flex",
++              alignItems: "center",
++              gap: 8,
++            }}
++            onClick={() => signIn("discord", { callbackUrl: "/" })}
++          >
++            <span>Continuer avec Discord</span>
+           </button>
+ 
++          {/* Séparateur */}
+           {showDev ? (
+-            <div className="stack-12">
+-              <div className="kicker">Dev only</div>
++            <div
++              style={{
++                borderTop: "1px solid rgba(255,255,255,0.06)",
++                marginTop: 8,
++                paddingTop: 8,
++                fontSize: 11,
++                color: "#999",
++              }}
++            >
++              Dev uniquement (local)
++            </div>
++          ) : null}
++
++          {/* Bloc dev login */}
++          {showDev ? (
++            <div className="stack-10">
+               <input
+                 className="input"
+                 placeholder="username"
+@@ -59,12 +90,13 @@ export default function LoginPage() {
+               />
+               <input
+                 className="input"
+-                placeholder="email (optional)"
++                placeholder="email (optionnel)"
+                 value={email}
+                 onChange={(e) => setEmail(e.target.value)}
+               />
+               <button
+-                className="btn btn-secondary btn-wide"
++                className="btn"
++                style={{ width: "100%" }}
+                 onClick={() =>
+                   signIn("credentials", {
+                     username,
+@@ -78,8 +110,17 @@ export default function LoginPage() {
+             </div>
+           ) : null}
+ 
+-          <div className="p" style={{ fontSize: 11, textAlign: "center" }}>
+-            By continuing, you agree to the usage terms.
++          {/* Texte bas de page */}
++          <div
++            className="p"
++            style={{
++              fontSize: 11,
++              color: "#9ca3af",
++              textAlign: "center",
++              marginTop: 4,
++            }}
++          >
++            En continuant, tu acceptes les conditions d&apos;utilisation.
+           </div>
+         </div>
+       </div>
+diff --git a/app/verify/page.tsx b/app/verify/page.tsx
+index 6e46acd..077a96e 100644
+--- a/app/verify/page.tsx
++++ b/app/verify/page.tsx
+@@ -33,22 +33,16 @@ export default function VerifyPage() {
+   }, [status]);
+ 
+   if (status === "loading") {
+-    return (
+-      <div className="container section">
+-        <div className="p">Loading...</div>
+-      </div>
+-    );
++    return <div className="container section"><div className="p">Loading...</div></div>;
+   }
+ 
+   if (status !== "authenticated") {
+     return (
+       <div className="container section">
+-        <div className="card" style={{ padding: 24, maxWidth: 520 }}>
+-          <div className="stack-12">
++        <div className="surface surface-strong glass border-grad" style={{ padding: 18 }}>
++          <div className="stack-10">
+             <div className="h2">Login required</div>
+-            <div className="p">
+-              You must log in with Discord to generate a verification code.
+-            </div>
++            <div className="p">You must log in with Discord to generate a verification code.</div>
+             <button className="btn btn-primary" onClick={() => signIn("discord", { callbackUrl: "/verify" })}>
+               Continue with Discord
+             </button>
+@@ -60,19 +54,17 @@ export default function VerifyPage() {
+ 
+   return (
+     <div className="container section">
+-      <div className="card" style={{ padding: 24, maxWidth: 620 }}>
+-        <div className="stack-16">
+-          <div className="stack-8">
+-            <div className="h2">Discord verification</div>
+-            <div className="p">
+-              Copy this code and run <span className="badge">/verify CODE</span> in your Discord server.
+-              Code expires quickly.
+-            </div>
++      <div className="surface surface-strong glass border-grad" style={{ padding: 18 }}>
++        <div className="stack-10">
++          <div className="h2">Discord verification</div>
++          <div className="p">
++            Copy this code and run <span className="badge">/verify CODE</span> in your Discord server.
++            Code expires fast.
+           </div>
+ 
+-          <div className="card" style={{ padding: 18 }}>
++          <div className="surface glass" style={{ padding: 14, borderRadius: 14 }}>
+             <div className="kicker">One-time code</div>
+-            <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: 1.5 }}>
++            <div style={{ fontSize: 28, fontWeight: 950, letterSpacing: 1.5 }}>
+               {code || "..."}
+             </div>
+           </div>
+diff --git a/components/Footer.tsx b/components/Footer.tsx
+deleted file mode 100644
+index 1daa967..0000000
+--- a/components/Footer.tsx
++++ /dev/null
+@@ -1,17 +0,0 @@
+-import Link from "next/link";
+-
+-export default function Footer() {
+-  return (
+-    <footer className="footer">
+-      <div className="container footer-inner">
+-        <div className="footer-links">
+-          <Link href="/market">Market</Link>
+-          <Link href="/orders">Orders</Link>
+-          <Link href="/seller">Seller</Link>
+-          <Link href="/rules">Rules</Link>
+-        </div>
+-        <span>© {new Date().getFullYear()} Donut2Donut. Escrow-first marketplace.</span>
+-      </div>
+-    </footer>
+-  );
+-}
+diff --git a/components/ListingCard.tsx b/components/ListingCard.tsx
+index b6fe1f5..c33bf64 100644
+--- a/components/ListingCard.tsx
++++ b/components/ListingCard.tsx
+@@ -29,15 +29,12 @@ export default function ListingCard({
+   escrowOn = true,
+ }: Props) {
+   const trustTone =
+-    trustPercent >= 85
+-      ? "badge-good"
+-      : trustPercent >= 65
+-        ? "badge-primary"
+-        : "badge-warn";
++    trustPercent >= 85 ? "badge-good" : trustPercent >= 65 ? "badge-blue" : "badge-warn";
+ 
+   return (
+     <Link href={href} className="card card-hover" style={{ textDecoration: "none" }}>
+-      <div className="card-media" style={{ position: "relative" }}>
++      {/* IMAGE */}
++      <div className="card-img" style={{ position: "relative" }}>
+         <Image
+           src={imageUrl}
+           alt={title}
+@@ -47,6 +44,18 @@ export default function ListingCard({
+           priority={false}
+         />
+ 
++        {/* premium overlay gradient */}
++        <div
++          aria-hidden="true"
++          style={{
++            position: "absolute",
++            inset: 0,
++            background:
++              "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.55) 100%)",
++          }}
++        />
++
++        {/* top chips */}
+         <div
+           style={{
+             position: "absolute",
+@@ -58,42 +67,90 @@ export default function ListingCard({
+             gap: 10,
+           }}
+         >
+-          <span className={`badge ${trustTone}`}>Trust {trustPercent}%</span>
++          <span className={`badge ${trustTone}`} style={{ boxShadow: "var(--shGlow)" }}>
++            Trust {trustPercent}%
++          </span>
++
+           {escrowOn ? (
+-            <span className="badge badge-good">Escrow</span>
++            <span className="badge badge-good ring-glow">Escrow</span>
+           ) : (
+             <span className="badge badge-warn">No escrow</span>
+           )}
+         </div>
++
++        {/* bottom price pop */}
++        <div
++          style={{
++            position: "absolute",
++            left: 12,
++            bottom: 12,
++            display: "flex",
++            alignItems: "center",
++            gap: 8,
++          }}
++        >
++          <span
++            className="glass"
++            style={{
++              padding: "8px 10px",
++              borderRadius: 14,
++              border: "1px solid rgba(255,255,255,0.16)",
++              background: "rgba(10,16,36,0.62)",
++              boxShadow: "var(--shPop)",
++              fontWeight: 950,
++              letterSpacing: "-0.02em",
++            }}
++          >
++            {priceLabel}
++          </span>
++
++          <span className="badge">{delivery}</span>
++        </div>
+       </div>
+ 
+-      <div className="card-body stack-12">
+-        <div className="stack-8">
+-          <div className="h3" style={{ fontWeight: 600 }}>
++      {/* BODY */}
++      <div style={{ padding: 16 }} className="stack-10">
++        <div className="stack-6">
++          <div
++            style={{
++              fontWeight: 900,
++              letterSpacing: "-0.015em",
++              lineHeight: 1.15,
++              fontSize: "1.02rem",
++            }}
++          >
+             {title}
+           </div>
+ 
+           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+-            <span className="p" style={{ fontSize: ".88rem" }}>
+-              by <span style={{ fontWeight: 600 }}>{sellerName}</span>
++            <span className="muted" style={{ fontSize: ".86rem" }}>
++              by <span style={{ color: "var(--txt1)", fontWeight: 780 }}>{sellerName}</span>
+             </span>
+ 
+-            {sellerVerified && <span className="badge badge-primary">Verified</span>}
++            {sellerVerified && <span className="badge badge-blue">Verified</span>}
+ 
+-            <span className="badge">{reviewCount} reviews</span>
++            <span className="badge">
++              {reviewCount} reviews
++            </span>
+           </div>
+         </div>
+ 
++        {/* bottom action hint */}
+         <div
++          className="surface glass"
+           style={{
++            padding: 10,
++            borderRadius: 16,
+             display: "flex",
+             justifyContent: "space-between",
+             alignItems: "center",
+-            gap: 10,
++            border: "1px solid rgba(255,255,255,0.10)",
+           }}
+         >
+-          <span className="badge">{delivery}</span>
+-          <span style={{ fontWeight: 600 }}>{priceLabel}</span>
++          <span className="muted" style={{ fontSize: ".86rem" }}>
++            View listing
++          </span>
++          <span className="badge badge-blue">Open</span>
+         </div>
+       </div>
+     </Link>
+diff --git a/components/Navbar.tsx b/components/Navbar.tsx
+index 69057a5..d711adb 100644
+--- a/components/Navbar.tsx
++++ b/components/Navbar.tsx
+@@ -2,71 +2,207 @@
+ 
+ import { useEffect, useState } from "react";
+ import Link from "next/link";
+-import { usePathname } from "next/navigation";
+ import { useSession, signIn, signOut } from "next-auth/react";
+ 
+-const navLinks = [
+-  { href: "/", label: "Home" },
+-  { href: "/market", label: "Market" },
+-  { href: "/orders", label: "Orders" },
+-  { href: "/seller", label: "Seller" },
+-  { href: "/rules", label: "Rules" },
+-];
+-
+ export default function Navbar() {
+   const [scrolled, setScrolled] = useState(false);
+-  const { status } = useSession();
+-  const pathname = usePathname();
++  const { data: session, status } = useSession();
++
++  // TODO: replace with real balance from DB or API
++  const balance = 0;
+ 
+   useEffect(() => {
+-    const onScroll = () => setScrolled(window.scrollY > 8);
++    const onScroll = () => setScrolled(window.scrollY > 10);
+     onScroll();
+     window.addEventListener("scroll", onScroll);
+     return () => window.removeEventListener("scroll", onScroll);
+   }, []);
+ 
+   return (
+-    <header className={`navbar ${scrolled ? "scrolled" : ""}`}>
+-      <div className="container nav-inner">
+-        <Link href="/" className="nav-logo">
+-          <span>Donut2Donut</span>
++    <header
++      style={{
++        position: "fixed",
++        top: 0,
++        left: 0,
++        right: 0,
++        zIndex: 50,
++        backdropFilter: "blur(14px)",
++        WebkitBackdropFilter: "blur(14px)",
++        background: scrolled ? "rgba(10,16,36,0.78)" : "rgba(10,16,36,0.58)",
++        borderBottom: scrolled
++          ? "1px solid rgba(255,255,255,0.18)"
++          : "1px solid rgba(255,255,255,0.10)",
++        transition: "background .18s ease, border-color .18s ease",
++      }}
++    >
++      <div
++        className="container"
++        style={{
++          height: scrolled ? 56 : 62,
++          display: "flex",
++          alignItems: "center",
++          position: "relative",
++        }}
++      >
++        {/* LEFT */}
++        <Link
++          href="/"
++          style={{
++            display: "flex",
++            alignItems: "baseline",
++            gap: 10,
++            minWidth: 260,
++          }}
++        >
++          <span style={{ fontWeight: 950, letterSpacing: "-0.02em" }}>
++            Donut2Donut
++          </span>
++
++          {/* subtitle ONLY on wide screens (prevents 2-line navbar) */}
++          <span
++            className="muted"
++            style={{
++              fontSize: ".78rem",
++              display: "none",
++            }}
++          >
++            Secure DonutSMP Marketplace
++          </span>
++
++          <style jsx>{`
++            @media (min-width: 980px) {
++              span.muted {
++                display: inline;
++              }
++            }
++          `}</style>
+         </Link>
+ 
+-        <nav className="nav-links">
+-          {navLinks.map((link) => (
+-            <Link
+-              key={link.href}
+-              href={link.href}
+-              className={`nav-link ${pathname === link.href ? "active" : ""}`}
+-            >
+-              {link.label}
+-            </Link>
+-          ))}
++        {/* CENTER (true centered) */}
++        <nav
++          className="glass border-grad"
++          style={{
++            position: "absolute",
++            left: "50%",
++            transform: "translateX(-50%)",
++            display: "flex",
++            alignItems: "center",
++            gap: 8,
++            padding: "6px 8px",
++            borderRadius: 999,
++          }}
++        >
++          <Link
++            href="/"
++            className="badge"
++            style={{ height: 32, display: "inline-flex", alignItems: "center" }}
++          >
++            Home
++          </Link>
++          <Link
++            href="/market"
++            className="badge badge-blue"
++            style={{ height: 32, display: "inline-flex", alignItems: "center" }}
++          >
++            Market
++          </Link>
++          <span
++            className="badge"
++            style={{ height: 32, display: "inline-flex", alignItems: "center" }}
++          >
++            Docs
++          </span>
+         </nav>
+ 
+-        <div className="nav-actions">
++        {/* RIGHT */}
++        <div
++          style={{
++            marginLeft: "auto",
++            display: "flex",
++            alignItems: "center",
++            gap: 10,
++          }}
++        >
++          {/* Sold: only when authenticated, just left of Logout */}
++          {status === "authenticated" && (
++            <div
++              className="surface glass"
++              style={{
++                padding: "4px 10px",
++                borderRadius: 999,
++                textAlign: "right",
++                fontSize: 13,
++              }}
++            >
++              <div
++                style={{
++                  fontSize: 10,
++                  textTransform: "uppercase",
++                  letterSpacing: 0.08,
++                  color: "#9ca3af",
++                }}
++              >
++                Sold
++              </div>
++              <div style={{ fontSize: 14, fontWeight: 800 }}>
++                {balance.toFixed(2)} €
++              </div>
++            </div>
++          )}
++
++          {/* Boutons qui changent selon la session */}
+           {status === "loading" && (
+-            <button className="btn btn-ghost" disabled>
+-              Loading
++            <button className="btn btn-ghost" style={{ height: 32 }} disabled>
++              Loading...
+             </button>
+           )}
++
+           {status === "unauthenticated" && (
+             <button
+               className="btn btn-ghost"
++              style={{ height: 32 }}
+               onClick={() => signIn(undefined, { callbackUrl: "/" })}
+             >
+-              Sign in
++              Login
+             </button>
+           )}
++
+           {status === "authenticated" && (
+             <button
+               className="btn btn-ghost"
++              style={{ height: 32 }}
+               onClick={() => signOut({ callbackUrl: "/" })}
+             >
+-              Sign out
++              Logout ({session?.user?.name ?? session?.user?.email})
+             </button>
+           )}
+-          <span className="badge badge-good">Escrow On</span>
++
++          <span
++            className="badge badge-good ring-glow"
++            style={{ height: 32, display: "inline-flex", alignItems: "center" }}
++          >
++            Escrow ON
++          </span>
++
++          {/* hide this on small screens so it doesn’t push layout */}
++          <span
++            className="muted"
++            style={{
++              fontSize: ".78rem",
++              display: "none",
++              whiteSpace: "nowrap",
++            }}
++          >
++            Proof • Disputes • Logs
++          </span>
++
++          <style jsx>{`
++            @media (min-width: 980px) {
++              span.muted {
++                display: inline;
++              }
++            }
++          `}</style>
+         </div>
+       </div>
+     </header>
+diff --git a/components/ui.tsx b/components/ui.tsx
+index 157ecba..54f0855 100644
+--- a/components/ui.tsx
++++ b/components/ui.tsx
+@@ -2,52 +2,33 @@ import Link from "next/link";
+ import clsx from "clsx";
+ 
+ export function Container({ children }: { children: React.ReactNode }) {
+-  return <div className="container section-tight">{children}</div>;
++  return <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>;
+ }
+ 
+ export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
+-  return <div className={clsx("card", className)}>{children}</div>;
++  return <div className={clsx("rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow", className)}>{children}</div>;
+ }
+ 
+-export function Button(
+-  props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+-    variant?: "primary" | "secondary" | "ghost" | "soft";
+-  }
+-) {
++export function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" }) {
+   const { className, variant = "primary", ...rest } = props;
+-  const variantClass =
+-    variant === "primary"
+-      ? "btn btn-primary"
+-      : variant === "secondary"
+-        ? "btn btn-secondary"
+-        : variant === "soft"
+-          ? "btn btn-soft"
+-          : "btn btn-ghost";
+-
+-  return <button {...rest} className={clsx(variantClass, className)} />;
+-}
+-
+-export function A({ href, children }: { href: string; children: React.ReactNode }) {
+   return (
+-    <Link href={href} className="nav-link">
+-      {children}
+-    </Link>
++    <button
++      {...rest}
++      className={clsx(
++        "rounded-xl px-4 py-2 text-sm font-medium transition",
++        variant === "primary"
++          ? "bg-white text-black hover:opacity-90"
++          : "border border-neutral-800 bg-transparent text-white hover:bg-neutral-900",
++        className
++      )}
++    />
+   );
+ }
+ 
+-export function Badge({
+-  children,
+-  variant = "default",
+-}: {
+-  children: React.ReactNode;
+-  variant?: "default" | "primary" | "accent";
+-}) {
+-  const variantClass =
+-    variant === "primary"
+-      ? "badge badge-primary"
+-      : variant === "accent"
+-        ? "badge badge-accent"
+-        : "badge";
++export function A({ href, children }: { href: string; children: React.ReactNode }) {
++  return <Link href={href} className="text-white hover:underline">{children}</Link>;
++}
+ 
+-  return <span className={variantClass}>{children}</span>;
++export function Badge({ children }: { children: React.ReactNode }) {
++  return <span className="rounded-full border border-neutral-800 bg-neutral-900 px-2 py-0.5 text-xs text-neutral-200">{children}</span>;
+ }
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 99bef4f..80ec4b8 100644
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -13,7 +13,7 @@ type TokenShape = {
+   discordId?: string;
+ };
+ 
+-function slugUsername(input: string): string {  
++function slugUsername(input: string): string {
+   return input
+     .trim()
+     .toLowerCase()
+@@ -47,7 +47,8 @@ async function upsertDiscordUser(params: {
+ 
+   const byDiscord = await db.user.findUnique({ where: { discordId } });
+   if (byDiscord) {
+-    const nextUsername = byDiscord.username || (await ensureUniqueUsername(username));
++    const nextUsername =
++      byDiscord.username || (await ensureUniqueUsername(username));
+     const user = await db.user.update({
+       where: { id: byDiscord.id },
+       data: {
+@@ -79,39 +80,33 @@ async function upsertDiscordUser(params: {
+ }
+ 
+ export const authOptions: NextAuthOptions = {
+-  debug: true,
++  debug: false,
+   session: { strategy: "jwt" },
+   secret: process.env.NEXTAUTH_SECRET,
+   pages: { signIn: "/login" },
+   providers: [
++    // DEV ONLY: login par username existant (seller-demo, buyer-demo, etc.)
+     ...(process.env.NODE_ENV === "development"
+       ? [
+           CredentialsProvider({
+             name: "Dev Login",
+             credentials: {
+               username: { label: "Username", type: "text" },
+-              email: { label: "Email", type: "email" },
+             },
+             async authorize(credentials) {
+               const schema = z.object({
+                 username: z.string().min(2).max(24),
+-                email: z.string().email().optional().or(z.literal("")),
+               });
+               const parsed = schema.safeParse(credentials);
+               if (!parsed.success) return null;
+ 
+-              const username = await ensureUniqueUsername(parsed.data.username);
+-              const email = parsed.data.email ? parsed.data.email.toLowerCase() : null;
++              const username = parsed.data.username.toLowerCase();
+ 
+-              let user = await db.user.findUnique({ where: { username } });
++              // On NE crée plus de user ici, on cherche un user existant
++              const user = await db.user.findUnique({ where: { username } });
+               if (!user) {
+-                user = await db.user.create({
+-                  data: {
+-                    username,
+-                    email: email ?? undefined,
+-                    sellerProfile: { create: {} },
+-                  },
+-                });
++                // si l'utilisateur n'existe pas, on refuse le login
++                return null;
+               }
+ 
+               return {
+@@ -142,7 +137,9 @@ export const authOptions: NextAuthOptions = {
+       if (!discordId) return false;
+ 
+       const usernameRaw =
+-        (profile as any)?.global_name || (profile as any)?.username || "user";
++        (profile as any)?.global_name ||
++        (profile as any)?.username ||
++        "user";
+       const email = (profile as any)?.email as string | undefined;
+ 
+       const avatarHash = (profile as any)?.avatar as string | null | undefined;
+diff --git a/lib/demo.ts b/lib/demo.ts
+index 05b5373..d6dd7ea 100644
+--- a/lib/demo.ts
++++ b/lib/demo.ts
+@@ -1,4 +1,7 @@
+-export const DEMO_MODE = true; // later: set false when real backend is ready
++import { prisma } from "@/lib/prisma";
++
++// Mets à false dès que tu veux utiliser les vraies annonces DB
++export const DEMO_MODE = false;
+ 
+ export type Listing = {
+   id: string;
+@@ -6,6 +9,7 @@ export type Listing = {
+   imageUrl: string;
+   priceLabel: string;
+ 
++  sellerId: string;        // <= ajouté
+   sellerName: string;
+   sellerVerified: boolean;
+ 
+@@ -30,6 +34,7 @@ const DEMO_LISTINGS: Listing[] = [
+     title: "Rare DonutSMP kit bundle",
+     imageUrl: "/donut3.png",
+     priceLabel: "€19.99",
++    sellerId: "demo-seller-id-1",
+     sellerName: "demo_seller",
+     sellerVerified: true,
+     trustPercent: 92,
+@@ -43,6 +48,7 @@ const DEMO_LISTINGS: Listing[] = [
+     title: "PvP coaching (60 minutes)",
+     imageUrl: "/donut2.png",
+     priceLabel: "€12.00",
++    sellerId: "demo-seller-id-2",
+     sellerName: "coach_kai",
+     sellerVerified: true,
+     trustPercent: 88,
+@@ -56,6 +62,7 @@ const DEMO_LISTINGS: Listing[] = [
+     title: "Custom mega-base build",
+     imageUrl: "/donut3.png",
+     priceLabel: "€35.00",
++    sellerId: "demo-seller-id-3",
+     sellerName: "builder_nyx",
+     sellerVerified: false,
+     trustPercent: 95,
+@@ -69,6 +76,7 @@ const DEMO_LISTINGS: Listing[] = [
+     title: "Overlay + HUD pack (HD)",
+     imageUrl: "/donut2.png",
+     priceLabel: "€7.50",
++    sellerId: "demo-seller-id-4",
+     sellerName: "edit_lab",
+     sellerVerified: true,
+     trustPercent: 90,
+@@ -80,24 +88,85 @@ const DEMO_LISTINGS: Listing[] = [
+ ];
+ 
+ /**
+- * Later you replace these with real DB/API calls.
+- * Keep the same function names so NO UI files need changes.
++ * Liste des annonces.
++ * - Si DEMO_MODE = true → utilise la liste en mémoire
++ * - Si DEMO_MODE = false → lit les annonces depuis Prisma
+  */
+ export async function getListings(): Promise<Listing[]> {
+   if (DEMO_MODE) return DEMO_LISTINGS;
+-  // TODO: replace with real fetch/db
+-  return [];
++
++  const listings = await prisma.listing.findMany({
++    include: { images: true, seller: true, sellerProfile: false },
++    orderBy: { createdAt: "desc" },
++  }); // [web:631]
++
++  return listings.map((l) => ({
++    id: l.id,
++    title: l.title,
++    imageUrl: l.images[0]?.url ?? "/donut2.png",
++    priceLabel: `${l.priceCents / 100} €`,
++
++    sellerId: l.sellerId,
++    sellerName: l.seller.username,
++    sellerVerified: !!l.seller.sellerProfile,
++
++    trustPercent: 90,
++    reviewCount: 0,
++    delivery:
++      l.deliveryType === "INGAME_TRADE"
++        ? "In-game trade"
++        : l.deliveryType === "SERVICE"
++        ? "Service"
++        : l.deliveryType === "MANUAL_DM"
++        ? "Manual"
++        : "Instant",
++    escrowOn: l.escrowOnly,
++    tags: [],
++  }));
+ }
+ 
++/**
++ * Une annonce par ID.
++ * - Si DEMO_MODE = true → cherche dans DEMO_LISTINGS
++ * - Si DEMO_MODE = false → lit depuis Prisma
++ */
+ export async function getListingById(id: string): Promise<Listing | null> {
+   if (DEMO_MODE) return DEMO_LISTINGS.find((x) => x.id === id) || null;
+-  // TODO: replace with real fetch/db
+-  return null;
++
++  const l = await prisma.listing.findUnique({
++    where: { id },
++    include: { images: true, seller: true },
++  }); // [web:631]
++
++  if (!l) return null;
++
++  return {
++    id: l.id,
++    title: l.title,
++    imageUrl: l.images[0]?.url ?? "/donut2.png",
++    priceLabel: `${l.priceCents / 100} €`,
++
++    sellerId: l.sellerId,
++    sellerName: l.seller.username,
++    sellerVerified: !!l.seller.sellerProfile,
++
++    trustPercent: 90,
++    reviewCount: 0,
++    delivery:
++      l.deliveryType === "INGAME_TRADE"
++        ? "In-game trade"
++        : l.deliveryType === "SERVICE"
++        ? "Service"
++        : l.deliveryType === "MANUAL_DM"
++        ? "Manual"
++        : "Instant",
++    escrowOn: l.escrowOnly,
++    tags: [],
++  };
+ }
+ 
+ /**
+- * Backwards compat so your current pages still work right now.
+- * (We’ll update pages next to use getListings/getListingById.)
++ * Compatibilité avec l’ancien code : toujours mock.
+  */
+ export function getDemoListings() {
+   return DEMO_LISTINGS;
+diff --git a/lib/donut-images.ts b/lib/donut-images.ts
+deleted file mode 100644
+index 74db5d8..0000000
+--- a/lib/donut-images.ts
++++ /dev/null
+@@ -1,33 +0,0 @@
+-import fs from "fs";
+-import path from "path";
+-
+-const donutCandidates = [
+-  "donut1.jpg",
+-  "donut1.png",
+-  "donut2.jpg",
+-  "donut2.png",
+-  "donut3.jpg",
+-  "donut3.png",
+-];
+-
+-let cached: string[] | null = null;
+-
+-export function getAvailableDonutImages() {
+-  if (cached) {
+-    return cached;
+-  }
+-
+-  const publicDir = path.join(process.cwd(), "public");
+-  cached = donutCandidates
+-    .filter((file) => fs.existsSync(path.join(publicDir, file)))
+-    .map((file) => `/${file}`);
+-  return cached;
+-}
+-
+-export function pickDonutImage(index = 0) {
+-  const available = getAvailableDonutImages();
+-  if (available.length === 0) {
+-    return "/donut1.jpg";
+-  }
+-  return available[index % available.length];
+-}
+diff --git a/lib/mc-items.json b/lib/mc-items.json
+new file mode 100644
+index 0000000..f7982aa
+--- /dev/null
++++ b/lib/mc-items.json
+@@ -0,0 +1,1242 @@
++{
++  "values": [
++    "minecraft:acacia_boat",
++    "minecraft:acacia_button",
++    "minecraft:acacia_chest_boat",
++    "minecraft:acacia_door",
++    "minecraft:acacia_fence",
++    "minecraft:acacia_fence_gate",
++    "minecraft:acacia_hanging_sign",
++    "minecraft:acacia_leaves",
++    "minecraft:acacia_log",
++    "minecraft:acacia_planks",
++    "minecraft:acacia_pressure_plate",
++    "minecraft:acacia_sapling",
++    "minecraft:acacia_sign",
++    "minecraft:acacia_slab",
++    "minecraft:acacia_stairs",
++    "minecraft:acacia_trapdoor",
++    "minecraft:acacia_wood",
++    "minecraft:activator_rail",
++    "minecraft:air",
++    "minecraft:allium",
++    "minecraft:amethyst_block",
++    "minecraft:amethyst_cluster",
++    "minecraft:amethyst_shard",
++    "minecraft:ancient_debris",
++    "minecraft:andesite",
++    "minecraft:andesite_slab",
++    "minecraft:andesite_stairs",
++    "minecraft:andesite_wall",
++    "minecraft:angler_pottery_sherd",
++    "minecraft:anvil",
++    "minecraft:apple",
++    "minecraft:archer_pottery_sherd",
++    "minecraft:armor_stand",
++    "minecraft:arms_up_pottery_sherd",
++    "minecraft:arrow",
++    "minecraft:axolotl_bucket",
++    "minecraft:axolotl_spawn_egg",
++    "minecraft:azalea",
++    "minecraft:azalea_leaves",
++    "minecraft:azure_bluet",
++    "minecraft:baked_potato",
++    "minecraft:bamboo",
++    "minecraft:bamboo_block",
++    "minecraft:bamboo_button",
++    "minecraft:bamboo_door",
++    "minecraft:bamboo_chest_raft",
++    "minecraft:bamboo_fence",
++    "minecraft:bamboo_fence_gate",
++    "minecraft:bamboo_hanging_sign",
++    "minecraft:bamboo_mosaic",
++    "minecraft:bamboo_mosaic_slab",
++    "minecraft:bamboo_mosaic_stairs",
++    "minecraft:bamboo_planks",
++    "minecraft:bamboo_pressure_plate",
++    "minecraft:bamboo_raft",
++    "minecraft:bamboo_sign",
++    "minecraft:bamboo_slab",
++    "minecraft:bamboo_stairs",
++    "minecraft:bamboo_trapdoor",
++    "minecraft:barrel",
++    "minecraft:barrier",
++    "minecraft:basalt",
++    "minecraft:bat_spawn_egg",
++    "minecraft:beacon",
++    "minecraft:bedrock",
++    "minecraft:bee_nest",
++    "minecraft:bee_spawn_egg",
++    "minecraft:beef",
++    "minecraft:beehive",
++    "minecraft:beetroot",
++    "minecraft:beetroot_seeds",
++    "minecraft:beetroot_soup",
++    "minecraft:bell",
++    "minecraft:big_dripleaf",
++    "minecraft:birch_boat",
++    "minecraft:birch_button",
++    "minecraft:birch_chest_boat",
++    "minecraft:birch_door",
++    "minecraft:birch_fence",
++    "minecraft:birch_fence_gate",
++    "minecraft:birch_hanging_sign",
++    "minecraft:birch_leaves",
++    "minecraft:birch_log",
++    "minecraft:birch_planks",
++    "minecraft:birch_pressure_plate",
++    "minecraft:birch_sapling",
++    "minecraft:birch_sign",
++    "minecraft:birch_slab",
++    "minecraft:birch_stairs",
++    "minecraft:birch_trapdoor",
++    "minecraft:birch_wood",
++    "minecraft:black_banner",
++    "minecraft:black_bed",
++    "minecraft:black_candle",
++    "minecraft:black_carpet",
++    "minecraft:black_concrete",
++    "minecraft:black_concrete_powder",
++    "minecraft:black_dye",
++    "minecraft:black_glazed_terracotta",
++    "minecraft:black_shulker_box",
++    "minecraft:black_stained_glass",
++    "minecraft:black_stained_glass_pane",
++    "minecraft:black_terracotta",
++    "minecraft:black_wool",
++    "minecraft:blackstone",
++    "minecraft:blackstone_slab",
++    "minecraft:blackstone_stairs",
++    "minecraft:blackstone_wall",
++    "minecraft:blade_pottery_sherd",
++    "minecraft:blast_furnace",
++    "minecraft:blaze_powder",
++    "minecraft:blaze_rod",
++    "minecraft:blaze_spawn_egg",
++    "minecraft:blue_banner",
++    "minecraft:blue_bed",
++    "minecraft:blue_candle",
++    "minecraft:blue_carpet",
++    "minecraft:blue_concrete",
++    "minecraft:blue_concrete_powder",
++    "minecraft:blue_dye",
++    "minecraft:blue_glazed_terracotta",
++    "minecraft:blue_ice",
++    "minecraft:blue_orchid",
++    "minecraft:blue_shulker_box",
++    "minecraft:blue_stained_glass",
++    "minecraft:blue_stained_glass_pane",
++    "minecraft:blue_terracotta",
++    "minecraft:blue_wool",
++    "minecraft:bone",
++    "minecraft:bone_block",
++    "minecraft:bone_meal",
++    "minecraft:book",
++    "minecraft:bookshelf",
++    "minecraft:bow",
++    "minecraft:bowl",
++    "minecraft:brain_coral",
++    "minecraft:brain_coral_block",
++    "minecraft:brain_coral_fan",
++    "minecraft:bread",
++    "minecraft:brewer_pottery_sherd",
++    "minecraft:brewing_stand",
++    "minecraft:brick",
++    "minecraft:brick_slab",
++    "minecraft:brick_stairs",
++    "minecraft:brick_wall",
++    "minecraft:bricks",
++    "minecraft:brown_banner",
++    "minecraft:brown_bed",
++    "minecraft:brown_candle",
++    "minecraft:brown_carpet",
++    "minecraft:brown_concrete",
++    "minecraft:brown_concrete_powder",
++    "minecraft:brown_dye",
++    "minecraft:brown_glazed_terracotta",
++    "minecraft:brown_mushroom",
++    "minecraft:brown_mushroom_block",
++    "minecraft:brown_shulker_box",
++    "minecraft:brown_stained_glass",
++    "minecraft:brown_stained_glass_pane",
++    "minecraft:brown_terracotta",
++    "minecraft:brown_wool",
++    "minecraft:brush",
++    "minecraft:bubble_coral",
++    "minecraft:bubble_coral_block",
++    "minecraft:bubble_coral_fan",
++    "minecraft:bucket",
++    "minecraft:budding_amethyst",
++    "minecraft:bundle",
++    "minecraft:burn_pottery_sherd",
++    "minecraft:cactus",
++    "minecraft:cake",
++    "minecraft:calcite",
++    "minecraft:calibrated_sculk_sensor",
++    "minecraft:campfire",
++    "minecraft:candle",
++    "minecraft:carrot",
++    "minecraft:carrot_on_a_stick",
++    "minecraft:cartography_table",
++    "minecraft:carved_pumpkin",
++    "minecraft:cat_spawn_egg",
++    "minecraft:cauldron",
++    "minecraft:cave_spider_spawn_egg",
++    "minecraft:chain",
++    "minecraft:chain_command_block",
++    "minecraft:chainmail_boots",
++    "minecraft:chainmail_chestplate",
++    "minecraft:chainmail_helmet",
++    "minecraft:chainmail_leggings",
++    "minecraft:charcoal",
++    "minecraft:cherry_boat",
++    "minecraft:cherry_button",
++    "minecraft:cherry_chest_boat",
++    "minecraft:cherry_door",
++    "minecraft:cherry_fence",
++    "minecraft:cherry_fence_gate",
++    "minecraft:cherry_hanging_sign",
++    "minecraft:cherry_leaves",
++    "minecraft:cherry_log",
++    "minecraft:cherry_planks",
++    "minecraft:cherry_pressure_plate",
++    "minecraft:cherry_sapling",
++    "minecraft:cherry_sign",
++    "minecraft:cherry_slab",
++    "minecraft:cherry_stairs",
++    "minecraft:cherry_trapdoor",
++    "minecraft:cherry_wood",
++    "minecraft:chest",
++    "minecraft:chest_minecart",
++    "minecraft:chicken",
++    "minecraft:chicken_spawn_egg",
++    "minecraft:chipped_anvil",
++    "minecraft:chiseled_bookshelf",
++    "minecraft:chiseled_deepslate",
++    "minecraft:chiseled_nether_bricks",
++    "minecraft:chiseled_polished_blackstone",
++    "minecraft:chiseled_quartz_block",
++    "minecraft:chiseled_red_sandstone",
++    "minecraft:chiseled_sandstone",
++    "minecraft:chiseled_stone_bricks",
++    "minecraft:chorus_flower",
++    "minecraft:chorus_fruit",
++    "minecraft:chorus_plant",
++    "minecraft:clay",
++    "minecraft:clay_ball",
++    "minecraft:clock",
++    "minecraft:coal",
++    "minecraft:coal_block",
++    "minecraft:coal_ore",
++    "minecraft:coarse_dirt",
++    "minecraft:coast_armor_trim_smithing_template",
++    "minecraft:cobbled_deepslate",
++    "minecraft:cobbled_deepslate_slab",
++    "minecraft:cobbled_deepslate_stairs",
++    "minecraft:cobbled_deepslate_wall",
++    "minecraft:cobblestone",
++    "minecraft:cobblestone_slab",
++    "minecraft:cobblestone_stairs",
++    "minecraft:cobblestone_wall",
++    "minecraft:cobweb",
++    "minecraft:cocoa_beans",
++    "minecraft:cod",
++    "minecraft:cod_bucket",
++    "minecraft:cod_spawn_egg",
++    "minecraft:command_block",
++    "minecraft:command_block_minecart",
++    "minecraft:comparator",
++    "minecraft:compass",
++    "minecraft:composter",
++    "minecraft:conduit",
++    "minecraft:cooked_beef",
++    "minecraft:cooked_chicken",
++    "minecraft:cooked_cod",
++    "minecraft:cooked_mutton",
++    "minecraft:cooked_porkchop",
++    "minecraft:cooked_rabbit",
++    "minecraft:cooked_salmon",
++    "minecraft:cookie",
++    "minecraft:copper_block",
++    "minecraft:copper_ingot",
++    "minecraft:copper_ore",
++    "minecraft:cornflower",
++    "minecraft:cow_spawn_egg",
++    "minecraft:cracked_deepslate_bricks",
++    "minecraft:cracked_deepslate_tiles",
++    "minecraft:cracked_nether_bricks",
++    "minecraft:cracked_polished_blackstone_bricks",
++    "minecraft:cracked_stone_bricks",
++    "minecraft:crafting_table",
++    "minecraft:creeper_banner_pattern",
++    "minecraft:creeper_head",
++    "minecraft:creeper_spawn_egg",
++    "minecraft:crimson_button",
++    "minecraft:crimson_door",
++    "minecraft:crimson_fence",
++    "minecraft:crimson_fence_gate",
++    "minecraft:crimson_fungus",
++    "minecraft:crimson_hanging_sign",
++    "minecraft:crimson_hyphae",
++    "minecraft:crimson_nylium",
++    "minecraft:crimson_planks",
++    "minecraft:crimson_pressure_plate",
++    "minecraft:crimson_roots",
++    "minecraft:crimson_sign",
++    "minecraft:crimson_slab",
++    "minecraft:crimson_stairs",
++    "minecraft:crimson_stem",
++    "minecraft:crimson_trapdoor",
++    "minecraft:crossbow",
++    "minecraft:crying_obsidian",
++    "minecraft:cut_copper",
++    "minecraft:cut_copper_slab",
++    "minecraft:cut_copper_stairs",
++    "minecraft:cut_red_sandstone",
++    "minecraft:cut_red_sandstone_slab",
++    "minecraft:cut_sandstone",
++    "minecraft:cut_sandstone_slab",
++    "minecraft:cyan_banner",
++    "minecraft:cyan_bed",
++    "minecraft:cyan_candle",
++    "minecraft:cyan_carpet",
++    "minecraft:cyan_concrete",
++    "minecraft:cyan_concrete_powder",
++    "minecraft:cyan_dye",
++    "minecraft:cyan_glazed_terracotta",
++    "minecraft:cyan_shulker_box",
++    "minecraft:cyan_stained_glass",
++    "minecraft:cyan_stained_glass_pane",
++    "minecraft:cyan_terracotta",
++    "minecraft:cyan_wool",
++    "minecraft:damaged_anvil",
++    "minecraft:dandelion",
++    "minecraft:danger_pottery_sherd",
++    "minecraft:dark_oak_boat",
++    "minecraft:dark_oak_button",
++    "minecraft:dark_oak_chest_boat",
++    "minecraft:dark_oak_door",
++    "minecraft:dark_oak_fence",
++    "minecraft:dark_oak_fence_gate",
++    "minecraft:dark_oak_hanging_sign",
++    "minecraft:dark_oak_leaves",
++    "minecraft:dark_oak_log",
++    "minecraft:dark_oak_planks",
++    "minecraft:dark_oak_pressure_plate",
++    "minecraft:dark_oak_sapling",
++    "minecraft:dark_oak_sign",
++    "minecraft:dark_oak_slab",
++    "minecraft:dark_oak_stairs",
++    "minecraft:dark_oak_trapdoor",
++    "minecraft:dark_oak_wood",
++    "minecraft:dark_prismarine",
++    "minecraft:dark_prismarine_slab",
++    "minecraft:dark_prismarine_stairs",
++    "minecraft:daylight_detector",
++    "minecraft:dead_brain_coral",
++    "minecraft:dead_brain_coral_block",
++    "minecraft:dead_brain_coral_fan",
++    "minecraft:dead_bubble_coral",
++    "minecraft:dead_bubble_coral_block",
++    "minecraft:dead_bubble_coral_fan",
++    "minecraft:dead_bush",
++    "minecraft:dead_fire_coral",
++    "minecraft:dead_fire_coral_block",
++    "minecraft:dead_fire_coral_fan",
++    "minecraft:dead_horn_coral",
++    "minecraft:dead_horn_coral_block",
++    "minecraft:dead_horn_coral_fan",
++    "minecraft:dead_tube_coral",
++    "minecraft:dead_tube_coral_block",
++    "minecraft:dead_tube_coral_fan",
++    "minecraft:debug_stick",
++    "minecraft:decorated_pot",
++    "minecraft:deepslate",
++    "minecraft:deepslate_brick_slab",
++    "minecraft:deepslate_brick_stairs",
++    "minecraft:deepslate_brick_wall",
++    "minecraft:deepslate_bricks",
++    "minecraft:deepslate_coal_ore",
++    "minecraft:deepslate_copper_ore",
++    "minecraft:deepslate_diamond_ore",
++    "minecraft:deepslate_emerald_ore",
++    "minecraft:deepslate_gold_ore",
++    "minecraft:deepslate_iron_ore",
++    "minecraft:deepslate_lapis_ore",
++    "minecraft:deepslate_redstone_ore",
++    "minecraft:deepslate_tile_slab",
++    "minecraft:deepslate_tile_stairs",
++    "minecraft:deepslate_tile_wall",
++    "minecraft:deepslate_tiles",
++    "minecraft:detector_rail",
++    "minecraft:diamond",
++    "minecraft:diamond_axe",
++    "minecraft:diamond_block",
++    "minecraft:diamond_boots",
++    "minecraft:diamond_chestplate",
++    "minecraft:diamond_helmet",
++    "minecraft:diamond_hoe",
++    "minecraft:diamond_horse_armor",
++    "minecraft:diamond_leggings",
++    "minecraft:diamond_ore",
++    "minecraft:diamond_pickaxe",
++    "minecraft:diamond_shovel",
++    "minecraft:diamond_sword",
++    "minecraft:diorite",
++    "minecraft:diorite_slab",
++    "minecraft:diorite_stairs",
++    "minecraft:diorite_wall",
++    "minecraft:dirt",
++    "minecraft:dirt_path",
++    "minecraft:dispenser",
++    "minecraft:dolphin_spawn_egg",
++    "minecraft:donkey_spawn_egg",
++    "minecraft:dragon_breath",
++    "minecraft:dragon_egg",
++    "minecraft:dragon_head",
++    "minecraft:dried_kelp",
++    "minecraft:dried_kelp_block",
++    "minecraft:dripstone_block",
++    "minecraft:dropper",
++    "minecraft:drowned_spawn_egg",
++    "minecraft:dune_armor_trim_smithing_template",
++    "minecraft:echo_shard",
++    "minecraft:egg",
++    "minecraft:elder_guardian_spawn_egg",
++    "minecraft:elytra",
++    "minecraft:emerald",
++    "minecraft:emerald_block",
++    "minecraft:emerald_ore",
++    "minecraft:enchanted_book",
++    "minecraft:enchanted_golden_apple",
++    "minecraft:enchanting_table",
++    "minecraft:end_crystal",
++    "minecraft:end_portal_frame",
++    "minecraft:end_rod",
++    "minecraft:end_stone",
++    "minecraft:end_stone_brick_slab",
++    "minecraft:end_stone_brick_stairs",
++    "minecraft:end_stone_brick_wall",
++    "minecraft:end_stone_bricks",
++    "minecraft:ender_chest",
++    "minecraft:ender_eye",
++    "minecraft:ender_pearl",
++    "minecraft:enderman_spawn_egg",
++    "minecraft:endermite_spawn_egg",
++    "minecraft:evoker_spawn_egg",
++    "minecraft:experience_bottle",
++    "minecraft:explorer_pottery_sherd",
++    "minecraft:exposed_copper",
++    "minecraft:exposed_cut_copper",
++    "minecraft:exposed_cut_copper_slab",
++    "minecraft:exposed_cut_copper_stairs",
++    "minecraft:eye_armor_trim_smithing_template",
++    "minecraft:farmland",
++    "minecraft:feather",
++    "minecraft:fermented_spider_eye",
++    "minecraft:fern",
++    "minecraft:filled_map",
++    "minecraft:fire_charge",
++    "minecraft:fire_coral",
++    "minecraft:fire_coral_block",
++    "minecraft:fire_coral_fan",
++    "minecraft:firework_rocket",
++    "minecraft:firework_star",
++    "minecraft:fishing_rod",
++    "minecraft:fletching_table",
++    "minecraft:flint",
++    "minecraft:flint_and_steel",
++    "minecraft:flower_banner_pattern",
++    "minecraft:flower_pot",
++    "minecraft:flowering_azalea",
++    "minecraft:flowering_azalea_leaves",
++    "minecraft:friend_pottery_sherd",
++    "minecraft:fox_spawn_egg",
++    "minecraft:frogspawn",
++    "minecraft:frog_spawn_egg",
++    "minecraft:furnace",
++    "minecraft:furnace_minecart",
++    "minecraft:ghast_spawn_egg",
++    "minecraft:ghast_tear",
++    "minecraft:gilded_blackstone",
++    "minecraft:glass",
++    "minecraft:glass_bottle",
++    "minecraft:glass_pane",
++    "minecraft:glistering_melon_slice",
++    "minecraft:globe_banner_pattern",
++    "minecraft:glow_berries",
++    "minecraft:glow_ink_sac",
++    "minecraft:glow_item_frame",
++    "minecraft:glow_lichen",
++    "minecraft:glow_squid_spawn_egg",
++    "minecraft:glowstone",
++    "minecraft:glowstone_dust",
++    "minecraft:goat_horn",
++    "minecraft:goat_spawn_egg",
++    "minecraft:gold_block",
++    "minecraft:gold_ingot",
++    "minecraft:gold_nugget",
++    "minecraft:gold_ore",
++    "minecraft:golden_apple",
++    "minecraft:golden_axe",
++    "minecraft:golden_boots",
++    "minecraft:golden_carrot",
++    "minecraft:golden_chestplate",
++    "minecraft:golden_helmet",
++    "minecraft:golden_hoe",
++    "minecraft:golden_horse_armor",
++    "minecraft:golden_leggings",
++    "minecraft:golden_pickaxe",
++    "minecraft:golden_shovel",
++    "minecraft:golden_sword",
++    "minecraft:granite",
++    "minecraft:granite_slab",
++    "minecraft:granite_stairs",
++    "minecraft:granite_wall",
++    "minecraft:short_grass",
++    "minecraft:grass_block",
++    "minecraft:gravel",
++    "minecraft:gray_banner",
++    "minecraft:gray_bed",
++    "minecraft:gray_candle",
++    "minecraft:gray_carpet",
++    "minecraft:gray_concrete",
++    "minecraft:gray_concrete_powder",
++    "minecraft:gray_dye",
++    "minecraft:gray_glazed_terracotta",
++    "minecraft:gray_shulker_box",
++    "minecraft:gray_stained_glass",
++    "minecraft:gray_stained_glass_pane",
++    "minecraft:gray_terracotta",
++    "minecraft:gray_wool",
++    "minecraft:green_banner",
++    "minecraft:green_bed",
++    "minecraft:green_candle",
++    "minecraft:green_carpet",
++    "minecraft:green_concrete",
++    "minecraft:green_concrete_powder",
++    "minecraft:green_dye",
++    "minecraft:green_glazed_terracotta",
++    "minecraft:green_shulker_box",
++    "minecraft:green_stained_glass",
++    "minecraft:green_stained_glass_pane",
++    "minecraft:green_terracotta",
++    "minecraft:green_wool",
++    "minecraft:grindstone",
++    "minecraft:guardian_spawn_egg",
++    "minecraft:gunpowder",
++    "minecraft:hanging_roots",
++    "minecraft:hay_block",
++    "minecraft:heart_of_the_sea",
++    "minecraft:heart_pottery_sherd",
++    "minecraft:heartbreak_pottery_sherd",
++    "minecraft:heavy_weighted_pressure_plate",
++    "minecraft:hoglin_spawn_egg",
++    "minecraft:honey_block",
++    "minecraft:honey_bottle",
++    "minecraft:honeycomb",
++    "minecraft:honeycomb_block",
++    "minecraft:hopper",
++    "minecraft:hopper_minecart",
++    "minecraft:horn_coral",
++    "minecraft:horn_coral_block",
++    "minecraft:horn_coral_fan",
++    "minecraft:horse_spawn_egg",
++    "minecraft:host_armor_trim_smithing_template",
++    "minecraft:howl_pottery_sherd",
++    "minecraft:husk_spawn_egg",
++    "minecraft:ice",
++    "minecraft:infested_chiseled_stone_bricks",
++    "minecraft:infested_cobblestone",
++    "minecraft:infested_cracked_stone_bricks",
++    "minecraft:infested_deepslate",
++    "minecraft:infested_mossy_stone_bricks",
++    "minecraft:infested_stone",
++    "minecraft:infested_stone_bricks",
++    "minecraft:ink_sac",
++    "minecraft:iron_axe",
++    "minecraft:iron_bars",
++    "minecraft:iron_block",
++    "minecraft:iron_boots",
++    "minecraft:iron_chestplate",
++    "minecraft:iron_door",
++    "minecraft:iron_helmet",
++    "minecraft:iron_hoe",
++    "minecraft:iron_horse_armor",
++    "minecraft:iron_ingot",
++    "minecraft:iron_leggings",
++    "minecraft:iron_nugget",
++    "minecraft:iron_ore",
++    "minecraft:iron_pickaxe",
++    "minecraft:iron_shovel",
++    "minecraft:iron_sword",
++    "minecraft:iron_trapdoor",
++    "minecraft:item_frame",
++    "minecraft:jack_o_lantern",
++    "minecraft:jigsaw",
++    "minecraft:jukebox",
++    "minecraft:jungle_boat",
++    "minecraft:jungle_button",
++    "minecraft:jungle_chest_boat",
++    "minecraft:jungle_door",
++    "minecraft:jungle_fence",
++    "minecraft:jungle_fence_gate",
++    "minecraft:jungle_hanging_sign",
++    "minecraft:jungle_leaves",
++    "minecraft:jungle_log",
++    "minecraft:jungle_planks",
++    "minecraft:jungle_pressure_plate",
++    "minecraft:jungle_sapling",
++    "minecraft:jungle_sign",
++    "minecraft:jungle_slab",
++    "minecraft:jungle_stairs",
++    "minecraft:jungle_trapdoor",
++    "minecraft:jungle_wood",
++    "minecraft:kelp",
++    "minecraft:knowledge_book",
++    "minecraft:ladder",
++    "minecraft:lantern",
++    "minecraft:lapis_block",
++    "minecraft:lapis_lazuli",
++    "minecraft:lapis_ore",
++    "minecraft:large_amethyst_bud",
++    "minecraft:large_fern",
++    "minecraft:lava_bucket",
++    "minecraft:lead",
++    "minecraft:leather",
++    "minecraft:leather_boots",
++    "minecraft:leather_chestplate",
++    "minecraft:leather_helmet",
++    "minecraft:leather_horse_armor",
++    "minecraft:leather_leggings",
++    "minecraft:lectern",
++    "minecraft:lever",
++    "minecraft:light",
++    "minecraft:light_blue_banner",
++    "minecraft:light_blue_bed",
++    "minecraft:light_blue_candle",
++    "minecraft:light_blue_carpet",
++    "minecraft:light_blue_concrete",
++    "minecraft:light_blue_concrete_powder",
++    "minecraft:light_blue_dye",
++    "minecraft:light_blue_glazed_terracotta",
++    "minecraft:light_blue_shulker_box",
++    "minecraft:light_blue_stained_glass",
++    "minecraft:light_blue_stained_glass_pane",
++    "minecraft:light_blue_terracotta",
++    "minecraft:light_blue_wool",
++    "minecraft:light_gray_banner",
++    "minecraft:light_gray_bed",
++    "minecraft:light_gray_candle",
++    "minecraft:light_gray_carpet",
++    "minecraft:light_gray_concrete",
++    "minecraft:light_gray_concrete_powder",
++    "minecraft:light_gray_dye",
++    "minecraft:light_gray_glazed_terracotta",
++    "minecraft:light_gray_shulker_box",
++    "minecraft:light_gray_stained_glass",
++    "minecraft:light_gray_stained_glass_pane",
++    "minecraft:light_gray_terracotta",
++    "minecraft:light_gray_wool",
++    "minecraft:light_weighted_pressure_plate",
++    "minecraft:lightning_rod",
++    "minecraft:lilac",
++    "minecraft:lily_of_the_valley",
++    "minecraft:lily_pad",
++    "minecraft:lime_banner",
++    "minecraft:lime_bed",
++    "minecraft:lime_candle",
++    "minecraft:lime_carpet",
++    "minecraft:lime_concrete",
++    "minecraft:lime_concrete_powder",
++    "minecraft:lime_dye",
++    "minecraft:lime_glazed_terracotta",
++    "minecraft:lime_shulker_box",
++    "minecraft:lime_stained_glass",
++    "minecraft:lime_stained_glass_pane",
++    "minecraft:lime_terracotta",
++    "minecraft:lime_wool",
++    "minecraft:lingering_potion",
++    "minecraft:llama_spawn_egg",
++    "minecraft:lodestone",
++    "minecraft:loom",
++    "minecraft:magenta_banner",
++    "minecraft:magenta_bed",
++    "minecraft:magenta_candle",
++    "minecraft:magenta_carpet",
++    "minecraft:magenta_concrete",
++    "minecraft:magenta_concrete_powder",
++    "minecraft:magenta_dye",
++    "minecraft:magenta_glazed_terracotta",
++    "minecraft:magenta_shulker_box",
++    "minecraft:magenta_stained_glass",
++    "minecraft:magenta_stained_glass_pane",
++    "minecraft:magenta_terracotta",
++    "minecraft:magenta_wool",
++    "minecraft:magma_block",
++    "minecraft:magma_cream",
++    "minecraft:magma_cube_spawn_egg",
++    "minecraft:mangrove_boat",
++    "minecraft:mangrove_button",
++    "minecraft:mangrove_chest_boat",
++    "minecraft:mangrove_door",
++    "minecraft:mangrove_fence",
++    "minecraft:mangrove_fence_gate",
++    "minecraft:mangrove_hanging_sign",
++    "minecraft:mangrove_leaves",
++    "minecraft:mangrove_log",
++    "minecraft:mangrove_planks",
++    "minecraft:mangrove_pressure_plate",
++    "minecraft:mangrove_propagule",
++    "minecraft:mangrove_roots",
++    "minecraft:mangrove_sign",
++    "minecraft:mangrove_slab",
++    "minecraft:mangrove_stairs",
++    "minecraft:mangrove_trapdoor",
++    "minecraft:mangrove_wood",
++    "minecraft:map",
++    "minecraft:medium_amethyst_bud",
++    "minecraft:melon",
++    "minecraft:melon_seeds",
++    "minecraft:melon_slice",
++    "minecraft:milk_bucket",
++    "minecraft:minecart",
++    "minecraft:miner_pottery_sherd",
++    "minecraft:mojang_banner_pattern",
++    "minecraft:mooshroom_spawn_egg",
++    "minecraft:moss_block",
++    "minecraft:moss_carpet",
++    "minecraft:mossy_cobblestone",
++    "minecraft:mossy_cobblestone_slab",
++    "minecraft:mossy_cobblestone_stairs",
++    "minecraft:mossy_cobblestone_wall",
++    "minecraft:mossy_stone_brick_slab",
++    "minecraft:mossy_stone_brick_stairs",
++    "minecraft:mossy_stone_brick_wall",
++    "minecraft:mossy_stone_bricks",
++    "minecraft:mourner_pottery_sherd",
++    "minecraft:mud",
++    "minecraft:muddy_mangrove_roots",
++    "minecraft:mule_spawn_egg",
++    "minecraft:mushroom_stem",
++    "minecraft:mushroom_stew",
++    "minecraft:music_disc_5",
++    "minecraft:music_disc_11",
++    "minecraft:music_disc_13",
++    "minecraft:music_disc_blocks",
++    "minecraft:music_disc_cat",
++    "minecraft:music_disc_chirp",
++    "minecraft:music_disc_far",
++    "minecraft:music_disc_mall",
++    "minecraft:music_disc_mellohi",
++    "minecraft:music_disc_pigstep",
++    "minecraft:music_disc_relic",
++    "minecraft:music_disc_stal",
++    "minecraft:music_disc_strad",
++    "minecraft:music_disc_wait",
++    "minecraft:music_disc_ward",
++    "minecraft:mutton",
++    "minecraft:mycelium",
++    "minecraft:name_tag",
++    "minecraft:nautilus_shell",
++    "minecraft:nether_brick",
++    "minecraft:nether_brick_fence",
++    "minecraft:nether_brick_slab",
++    "minecraft:nether_brick_stairs",
++    "minecraft:nether_brick_wall",
++    "minecraft:nether_bricks",
++    "minecraft:nether_gold_ore",
++    "minecraft:nether_quartz_ore",
++    "minecraft:nether_sprouts",
++    "minecraft:nether_star",
++    "minecraft:nether_wart",
++    "minecraft:nether_wart_block",
++    "minecraft:netherite_axe",
++    "minecraft:netherite_block",
++    "minecraft:netherite_boots",
++    "minecraft:netherite_chestplate",
++    "minecraft:netherite_helmet",
++    "minecraft:netherite_hoe",
++    "minecraft:netherite_ingot",
++    "minecraft:netherite_leggings",
++    "minecraft:netherite_pickaxe",
++    "minecraft:netherite_scrap",
++    "minecraft:netherite_shovel",
++    "minecraft:netherite_sword",
++    "minecraft:netherite_upgrade_smithing_template",
++    "minecraft:netherrack",
++    "minecraft:note_block",
++    "minecraft:oak_boat",
++    "minecraft:oak_button",
++    "minecraft:oak_chest_boat",
++    "minecraft:oak_door",
++    "minecraft:oak_fence",
++    "minecraft:oak_fence_gate",
++    "minecraft:oak_hanging_sign",
++    "minecraft:oak_leaves",
++    "minecraft:oak_log",
++    "minecraft:oak_planks",
++    "minecraft:oak_pressure_plate",
++    "minecraft:oak_sapling",
++    "minecraft:oak_sign",
++    "minecraft:oak_slab",
++    "minecraft:oak_stairs",
++    "minecraft:oak_trapdoor",
++    "minecraft:oak_wood",
++    "minecraft:observer",
++    "minecraft:obsidian",
++    "minecraft:ocelot_spawn_egg",
++    "minecraft:ochre_froglight",
++    "minecraft:orange_banner",
++    "minecraft:orange_bed",
++    "minecraft:orange_candle",
++    "minecraft:orange_carpet",
++    "minecraft:orange_concrete",
++    "minecraft:orange_concrete_powder",
++    "minecraft:orange_dye",
++    "minecraft:orange_glazed_terracotta",
++    "minecraft:orange_shulker_box",
++    "minecraft:orange_stained_glass",
++    "minecraft:orange_stained_glass_pane",
++    "minecraft:orange_terracotta",
++    "minecraft:orange_tulip",
++    "minecraft:orange_wool",
++    "minecraft:oxeye_daisy",
++    "minecraft:oxidized_copper",
++    "minecraft:oxidized_cut_copper",
++    "minecraft:oxidized_cut_copper_slab",
++    "minecraft:oxidized_cut_copper_stairs",
++    "minecraft:packed_ice",
++    "minecraft:painting",
++    "minecraft:panda_spawn_egg",
++    "minecraft:paper",
++    "minecraft:parrot_spawn_egg",
++    "minecraft:pearlescent_froglight",
++    "minecraft:peony",
++    "minecraft:petrified_oak_slab",
++    "minecraft:phantom_membrane",
++    "minecraft:phantom_spawn_egg",
++    "minecraft:pig_spawn_egg",
++    "minecraft:piglin_banner_pattern",
++    "minecraft:piglin_brute_spawn_egg",
++    "minecraft:piglin_spawn_egg",
++    "minecraft:pillager_spawn_egg",
++    "minecraft:pink_banner",
++    "minecraft:pink_bed",
++    "minecraft:pink_candle",
++    "minecraft:pink_carpet",
++    "minecraft:pink_concrete",
++    "minecraft:pink_concrete_powder",
++    "minecraft:pink_dye",
++    "minecraft:pink_glazed_terracotta",
++    "minecraft:pink_petals",
++    "minecraft:pink_shulker_box",
++    "minecraft:pink_stained_glass",
++    "minecraft:pink_stained_glass_pane",
++    "minecraft:pink_terracotta",
++    "minecraft:pink_tulip",
++    "minecraft:pink_wool",
++    "minecraft:piston",
++    "minecraft:pitcher_plant",
++    "minecraft:pitcher_pod",
++    "minecraft:player_head",
++    "minecraft:plenty_pottery_sherd",
++    "minecraft:podzol",
++    "minecraft:pointed_dripstone",
++    "minecraft:poisonous_potato",
++    "minecraft:polar_bear_spawn_egg",
++    "minecraft:polished_andesite",
++    "minecraft:polished_andesite_slab",
++    "minecraft:polished_andesite_stairs",
++    "minecraft:polished_basalt",
++    "minecraft:polished_blackstone",
++    "minecraft:polished_blackstone_brick_slab",
++    "minecraft:polished_blackstone_brick_stairs",
++    "minecraft:polished_blackstone_brick_wall",
++    "minecraft:polished_blackstone_bricks",
++    "minecraft:polished_blackstone_button",
++    "minecraft:polished_blackstone_pressure_plate",
++    "minecraft:polished_blackstone_slab",
++    "minecraft:polished_blackstone_stairs",
++    "minecraft:polished_blackstone_wall",
++    "minecraft:polished_deepslate",
++    "minecraft:polished_deepslate_slab",
++    "minecraft:polished_deepslate_stairs",
++    "minecraft:polished_deepslate_wall",
++    "minecraft:polished_diorite",
++    "minecraft:polished_diorite_slab",
++    "minecraft:polished_diorite_stairs",
++    "minecraft:polished_granite",
++    "minecraft:polished_granite_slab",
++    "minecraft:polished_granite_stairs",
++    "minecraft:popped_chorus_fruit",
++    "minecraft:poppy",
++    "minecraft:porkchop",
++    "minecraft:potato",
++    "minecraft:potion",
++    "minecraft:powder_snow_bucket",
++    "minecraft:powered_rail",
++    "minecraft:prismarine",
++    "minecraft:prismarine_brick_slab",
++    "minecraft:prismarine_brick_stairs",
++    "minecraft:prismarine_bricks",
++    "minecraft:prismarine_crystals",
++    "minecraft:prismarine_shard",
++    "minecraft:prismarine_slab",
++    "minecraft:prismarine_stairs",
++    "minecraft:prismarine_wall",
++    "minecraft:prize_pottery_sherd",
++    "minecraft:pufferfish",
++    "minecraft:pufferfish_bucket",
++    "minecraft:pufferfish_spawn_egg",
++    "minecraft:pumpkin",
++    "minecraft:pumpkin_pie",
++    "minecraft:pumpkin_seeds",
++    "minecraft:purple_banner",
++    "minecraft:purple_bed",
++    "minecraft:purple_candle",
++    "minecraft:purple_carpet",
++    "minecraft:purple_concrete",
++    "minecraft:purple_concrete_powder",
++    "minecraft:purple_dye",
++    "minecraft:purple_glazed_terracotta",
++    "minecraft:purple_shulker_box",
++    "minecraft:purple_stained_glass",
++    "minecraft:purple_stained_glass_pane",
++    "minecraft:purple_terracotta",
++    "minecraft:purple_wool",
++    "minecraft:purpur_block",
++    "minecraft:purpur_pillar",
++    "minecraft:purpur_slab",
++    "minecraft:purpur_stairs",
++    "minecraft:quartz",
++    "minecraft:quartz_block",
++    "minecraft:quartz_bricks",
++    "minecraft:quartz_pillar",
++    "minecraft:quartz_slab",
++    "minecraft:quartz_stairs",
++    "minecraft:rabbit",
++    "minecraft:rabbit_foot",
++    "minecraft:rabbit_hide",
++    "minecraft:rabbit_spawn_egg",
++    "minecraft:rabbit_stew",
++    "minecraft:rail",
++    "minecraft:raiser_armor_trim_smithing_template",
++    "minecraft:ravager_spawn_egg",
++    "minecraft:raw_copper",
++    "minecraft:raw_copper_block",
++    "minecraft:raw_gold",
++    "minecraft:raw_gold_block",
++    "minecraft:raw_iron",
++    "minecraft:raw_iron_block",
++    "minecraft:recovery_compass",
++    "minecraft:red_banner",
++    "minecraft:red_bed",
++    "minecraft:red_candle",
++    "minecraft:red_carpet",
++    "minecraft:red_concrete",
++    "minecraft:red_concrete_powder",
++    "minecraft:red_dye",
++    "minecraft:red_glazed_terracotta",
++    "minecraft:red_mushroom",
++    "minecraft:red_mushroom_block",
++    "minecraft:red_nether_brick_slab",
++    "minecraft:red_nether_brick_stairs",
++    "minecraft:red_nether_brick_wall",
++    "minecraft:red_nether_bricks",
++    "minecraft:red_sand",
++    "minecraft:red_sandstone",
++    "minecraft:red_sandstone_slab",
++    "minecraft:red_sandstone_stairs",
++    "minecraft:red_sandstone_wall",
++    "minecraft:red_shulker_box",
++    "minecraft:red_stained_glass",
++    "minecraft:red_stained_glass_pane",
++    "minecraft:red_terracotta",
++    "minecraft:red_tulip",
++    "minecraft:red_wool",
++    "minecraft:redstone",
++    "minecraft:redstone_block",
++    "minecraft:redstone_lamp",
++    "minecraft:redstone_ore",
++    "minecraft:redstone_torch",
++    "minecraft:repeater",
++    "minecraft:repeating_command_block",
++    "minecraft:respawn_anchor",
++    "minecraft:rib_armor_trim_smithing_template",
++    "minecraft:rooted_dirt",
++    "minecraft:rose_bush",
++    "minecraft:rotten_flesh",
++    "minecraft:saddle",
++    "minecraft:salmon",
++    "minecraft:salmon_bucket",
++    "minecraft:salmon_spawn_egg",
++    "minecraft:sand",
++    "minecraft:sandstone",
++    "minecraft:sandstone_slab",
++    "minecraft:sandstone_stairs",
++    "minecraft:sandstone_wall",
++    "minecraft:scaffolding",
++    "minecraft:sculk",
++    "minecraft:sculk_catalyst",
++    "minecraft:sculk_vein",
++    "minecraft:sculk_sensor",
++    "minecraft:sculk_shrieker",
++    "minecraft:scute",
++    "minecraft:sea_lantern",
++    "minecraft:sea_pickle",
++    "minecraft:seagrass",
++    "minecraft:sentry_armor_trim_smithing_template",
++    "minecraft:shaper_armor_trim_smithing_template",
++    "minecraft:shears",
++    "minecraft:sheep_spawn_egg",
++    "minecraft:shield",
++    "minecraft:shroomlight",
++    "minecraft:sheaf_pottery_sherd",
++    "minecraft:shelter_pottery_sherd",
++    "minecraft:shulker_box",
++    "minecraft:shulker_shell",
++    "minecraft:shulker_spawn_egg",
++    "minecraft:silence_armor_trim_smithing_template",
++    "minecraft:silverfish_spawn_egg",
++    "minecraft:skeleton_horse_spawn_egg",
++    "minecraft:skeleton_skull",
++    "minecraft:skeleton_spawn_egg",
++    "minecraft:skull_banner_pattern",
++    "minecraft:skull_pottery_sherd",
++    "minecraft:slime_ball",
++    "minecraft:slime_block",
++    "minecraft:slime_spawn_egg",
++    "minecraft:small_amethyst_bud",
++    "minecraft:small_dripleaf",
++    "minecraft:smithing_table",
++    "minecraft:smoker",
++    "minecraft:smooth_basalt",
++    "minecraft:smooth_quartz",
++    "minecraft:smooth_quartz_slab",
++    "minecraft:smooth_quartz_stairs",
++    "minecraft:smooth_red_sandstone",
++    "minecraft:smooth_red_sandstone_slab",
++    "minecraft:smooth_red_sandstone_stairs",
++    "minecraft:smooth_sandstone",
++    "minecraft:smooth_sandstone_slab",
++    "minecraft:smooth_sandstone_stairs",
++    "minecraft:smooth_stone",
++    "minecraft:smooth_stone_slab",
++    "minecraft:sniffer_egg",
++    "minecraft:sniffer_spawn_egg",
++    "minecraft:snort_pottery_sherd",
++    "minecraft:snout_armor_trim_smithing_template",
++    "minecraft:snow",
++    "minecraft:snow_block",
++    "minecraft:snowball",
++    "minecraft:soul_campfire",
++    "minecraft:soul_lantern",
++    "minecraft:soul_sand",
++    "minecraft:soul_soil",
++    "minecraft:soul_torch",
++    "minecraft:spawner",
++    "minecraft:spectral_arrow",
++    "minecraft:spider_eye",
++    "minecraft:spider_spawn_egg",
++    "minecraft:spire_armor_trim_smithing_template",
++    "minecraft:splash_potion",
++    "minecraft:sponge",
++    "minecraft:spore_blossom",
++    "minecraft:spruce_boat",
++    "minecraft:spruce_button",
++    "minecraft:spruce_chest_boat",
++    "minecraft:spruce_door",
++    "minecraft:spruce_fence",
++    "minecraft:spruce_fence_gate",
++    "minecraft:spruce_hanging_sign",
++    "minecraft:spruce_leaves",
++    "minecraft:spruce_log",
++    "minecraft:spruce_planks",
++    "minecraft:spruce_pressure_plate",
++    "minecraft:spruce_sapling",
++    "minecraft:spruce_sign",
++    "minecraft:spruce_slab",
++    "minecraft:spruce_stairs",
++    "minecraft:spruce_trapdoor",
++    "minecraft:spruce_wood",
++    "minecraft:spyglass",
++    "minecraft:squid_spawn_egg",
++    "minecraft:stick",
++    "minecraft:sticky_piston",
++    "minecraft:stone",
++    "minecraft:stone_axe",
++    "minecraft:stone_brick_slab",
++    "minecraft:stone_brick_stairs",
++    "minecraft:stone_brick_wall",
++    "minecraft:stone_bricks",
++    "minecraft:stone_button",
++    "minecraft:stone_hoe",
++    "minecraft:stone_pickaxe",
++    "minecraft:stone_pressure_plate",
++    "minecraft:stone_shovel",
++    "minecraft:stone_slab",
++    "minecraft:stone_stairs",
++    "minecraft:stone_sword",
++    "minecraft:stonecutter",
++    "minecraft:stray_spawn_egg",
++    "minecraft:strider_spawn_egg",
++    "minecraft:string",
++    "minecraft:stripped_acacia_log",
++    "minecraft:stripped_acacia_wood",
++    "minecraft:stripped_bamboo_block",
++    "minecraft:stripped_birch_log",
++    "minecraft:stripped_birch_wood",
++    "minecraft:stripped_cherry_log",
++    "minecraft:stripped_cherry_wood",
++    "minecraft:stripped_crimson_hyphae",
++    "minecraft:stripped_crimson_stem",
++    "minecraft:stripped_dark_oak_log",
++    "minecraft:stripped_dark_oak_wood",
++    "minecraft:stripped_jungle_log",
++    "minecraft:stripped_jungle_wood",
++    "minecraft:stripped_mangrove_log",
++    "minecraft:stripped_mangrove_wood",
++    "minecraft:stripped_oak_log",
++    "minecraft:stripped_oak_wood",
++    "minecraft:stripped_spruce_log",
++    "minecraft:stripped_spruce_wood",
++    "minecraft:stripped_warped_hyphae",
++    "minecraft:stripped_warped_stem",
++    "minecraft:structure_block",
++    "minecraft:structure_void",
++    "minecraft:sugar",
++    "minecraft:sugar_cane",
++    "minecraft:sunflower",
++    "minecraft:suspicious_gravel",
++    "minecraft:suspicious_sand",
++    "minecraft:suspicious_stew",
++    "minecraft:sweet_berries",
++    "minecraft:tadpole_bucket",
++    "minecraft:tall_grass",
++    "minecraft:target",
++    "minecraft:terracotta",
++    "minecraft:tide_armor_trim_smithing_template",
++    "minecraft:tinted_glass",
++    "minecraft:tipped_arrow",
++    "minecraft:tnt",
++    "minecraft:tnt_minecart",
++    "minecraft:torch",
++    "minecraft:torchflower",
++    "minecraft:torchflower_seeds",
++    "minecraft:totem_of_undying",
++    "minecraft:trader_llama_spawn_egg",
++    "minecraft:trapped_chest",
++    "minecraft:trident",
++    "minecraft:tripwire_hook",
++    "minecraft:tropical_fish",
++    "minecraft:tropical_fish_bucket",
++    "minecraft:tropical_fish_spawn_egg",
++    "minecraft:tube_coral",
++    "minecraft:tube_coral_block",
++    "minecraft:tube_coral_fan",
++    "minecraft:tuff",
++    "minecraft:turtle_egg",
++    "minecraft:turtle_helmet",
++    "minecraft:turtle_spawn_egg",
++    "minecraft:twisting_vines",
++    "minecraft:verdant_froglight",
++    "minecraft:vex_armor_trim_smithing_template",
++    "minecraft:vex_spawn_egg",
++    "minecraft:villager_spawn_egg",
++    "minecraft:vindicator_spawn_egg",
++    "minecraft:vine",
++    "minecraft:wandering_trader_spawn_egg",
++    "minecraft:ward_armor_trim_smithing_template",
++    "minecraft:warped_button",
++    "minecraft:warped_door",
++    "minecraft:warped_fence",
++    "minecraft:warped_fence_gate",
++    "minecraft:warped_fungus",
++    "minecraft:warped_fungus_on_a_stick",
++    "minecraft:warped_hanging_sign",
++    "minecraft:warped_hyphae",
++    "minecraft:warped_nylium",
++    "minecraft:warped_planks",
++    "minecraft:warped_pressure_plate",
++    "minecraft:warped_roots",
++    "minecraft:warped_sign",
++    "minecraft:warped_slab",
++    "minecraft:warped_stairs",
++    "minecraft:warped_stem",
++    "minecraft:warped_trapdoor",
++    "minecraft:warped_wart_block",
++    "minecraft:water_bucket",
++    "minecraft:waxed_copper_block",
++    "minecraft:waxed_cut_copper",
++    "minecraft:waxed_cut_copper_slab",
++    "minecraft:waxed_cut_copper_stairs",
++    "minecraft:waxed_exposed_copper",
++    "minecraft:waxed_exposed_cut_copper",
++    "minecraft:waxed_exposed_cut_copper_slab",
++    "minecraft:waxed_exposed_cut_copper_stairs",
++    "minecraft:waxed_oxidized_copper",
++    "minecraft:waxed_oxidized_cut_copper",
++    "minecraft:waxed_oxidized_cut_copper_slab",
++    "minecraft:waxed_oxidized_cut_copper_stairs",
++    "minecraft:waxed_weathered_copper",
++    "minecraft:waxed_weathered_cut_copper",
++    "minecraft:waxed_weathered_cut_copper_slab",
++    "minecraft:waxed_weathered_cut_copper_stairs",
++    "minecraft:wayfinder_armor_trim_smithing_template",
++    "minecraft:weathered_copper",
++    "minecraft:weathered_cut_copper",
++    "minecraft:weathered_cut_copper_slab",
++    "minecraft:weathered_cut_copper_stairs",
++    "minecraft:weeping_vines",
++    "minecraft:wet_sponge",
++    "minecraft:wheat",
++    "minecraft:wheat_seeds",
++    "minecraft:white_banner",
++    "minecraft:white_bed",
++    "minecraft:white_candle",
++    "minecraft:white_carpet",
++    "minecraft:white_concrete",
++    "minecraft:white_concrete_powder",
++    "minecraft:white_dye",
++    "minecraft:white_glazed_terracotta",
++    "minecraft:white_shulker_box",
++    "minecraft:white_stained_glass",
++    "minecraft:white_stained_glass_pane",
++    "minecraft:white_terracotta",
++    "minecraft:white_tulip",
++    "minecraft:white_wool",
++    "minecraft:wild_armor_trim_smithing_template",
++    "minecraft:witch_spawn_egg",
++    "minecraft:wither_rose",
++    "minecraft:wither_skeleton_skull",
++    "minecraft:wither_skeleton_spawn_egg",
++    "minecraft:wolf_spawn_egg",
++    "minecraft:wooden_axe",
++    "minecraft:wooden_hoe",
++    "minecraft:wooden_pickaxe",
++    "minecraft:wooden_shovel",
++    "minecraft:wooden_sword",
++    "minecraft:writable_book",
++    "minecraft:written_book",
++    "minecraft:yellow_banner",
++    "minecraft:yellow_bed",
++    "minecraft:yellow_candle",
++    "minecraft:yellow_carpet",
++    "minecraft:yellow_concrete",
++    "minecraft:yellow_concrete_powder",
++    "minecraft:yellow_dye",
++    "minecraft:yellow_glazed_terracotta",
++    "minecraft:yellow_shulker_box",
++    "minecraft:yellow_stained_glass",
++    "minecraft:yellow_stained_glass_pane",
++    "minecraft:yellow_terracotta",
++    "minecraft:yellow_wool",
++    "minecraft:zoglin_spawn_egg",
++    "minecraft:zombie_head",
++    "minecraft:zombie_horse_spawn_egg",
++    "minecraft:zombie_spawn_egg",
++    "minecraft:zombie_villager_spawn_egg",
++    "minecraft:zombified_piglin_spawn_egg"
++  ]
++}
+diff --git a/lib/prisma.ts b/lib/prisma.ts
+new file mode 100644
+index 0000000..901f3a0
+--- /dev/null
++++ b/lib/prisma.ts
+@@ -0,0 +1,3 @@
++import { PrismaClient } from "@prisma/client";
++
++export const prisma = new PrismaClient();
+diff --git a/prisma/dev.db b/prisma/dev.db
+index e3d8aae..ba6b324 100644
+Binary files a/prisma/dev.db and b/prisma/dev.db differ
+diff --git a/public/donut3.png b/public/donut3.png
+index 2212130..55350ff 100644
+Binary files a/public/donut3.png and b/public/donut3.png differ
