@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getDonutImage } from "@/lib/donut-images";
 
 // Mets à false dès que tu veux utiliser les vraies annonces DB
 export const DEMO_MODE = false;
@@ -32,7 +33,7 @@ const DEMO_LISTINGS: Listing[] = [
   {
     id: "1",
     title: "Rare DonutSMP kit bundle",
-    imageUrl: "/donut3.png",
+    imageUrl: getDonutImage(2),
     priceLabel: "€19.99",
     sellerId: "demo-seller-id-1",
     sellerName: "demo_seller",
@@ -46,7 +47,7 @@ const DEMO_LISTINGS: Listing[] = [
   {
     id: "2",
     title: "PvP coaching (60 minutes)",
-    imageUrl: "/donut2.png",
+    imageUrl: getDonutImage(1),
     priceLabel: "€12.00",
     sellerId: "demo-seller-id-2",
     sellerName: "coach_kai",
@@ -60,7 +61,7 @@ const DEMO_LISTINGS: Listing[] = [
   {
     id: "3",
     title: "Custom mega-base build",
-    imageUrl: "/donut3.png",
+    imageUrl: getDonutImage(0),
     priceLabel: "€35.00",
     sellerId: "demo-seller-id-3",
     sellerName: "builder_nyx",
@@ -74,7 +75,7 @@ const DEMO_LISTINGS: Listing[] = [
   {
     id: "4",
     title: "Overlay + HUD pack (HD)",
-    imageUrl: "/donut2.png",
+    imageUrl: getDonutImage(1),
     priceLabel: "€7.50",
     sellerId: "demo-seller-id-4",
     sellerName: "edit_lab",
@@ -103,7 +104,7 @@ export async function getListings(): Promise<Listing[]> {
   return listings.map((l) => ({
     id: l.id,
     title: l.title,
-    imageUrl: l.images[0]?.url ?? "/donut2.png",
+    imageUrl: l.images[0]?.url ?? getDonutImage(1),
     priceLabel: `${l.priceCents / 100} €`,
 
     sellerId: l.sellerId,
@@ -143,7 +144,7 @@ export async function getListingById(id: string): Promise<Listing | null> {
   return {
     id: l.id,
     title: l.title,
-    imageUrl: l.images[0]?.url ?? "/donut2.png",
+    imageUrl: l.images[0]?.url ?? getDonutImage(1),
     priceLabel: `${l.priceCents / 100} €`,
 
     sellerId: l.sellerId,

@@ -71,12 +71,14 @@ export async function POST(req: Request) {
     }
 
     // 4) Récupérer une category existante (par défaut)
-    const category = await prisma.category.findFirst();
+    let category = await prisma.category.findFirst();
     if (!category) {
-      return NextResponse.json(
-        { error: "No category in DB" },
-        { status: 400 }
-      );
+      category = await prisma.category.create({
+        data: {
+          name: "General",
+          slug: "general",
+        },
+      });
     }
 
     // 5) Créer l'annonce liée au user connecté

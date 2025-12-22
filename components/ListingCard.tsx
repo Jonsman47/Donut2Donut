@@ -29,128 +29,72 @@ export default function ListingCard({
   escrowOn = true,
 }: Props) {
   const trustTone =
-    trustPercent >= 85 ? "badge-good" : trustPercent >= 65 ? "badge-blue" : "badge-warn";
+    trustPercent >= 85
+      ? "badge-good"
+      : trustPercent >= 65
+      ? "badge-blue"
+      : "badge-warn";
 
   return (
-    <Link href={href} className="card card-hover" style={{ textDecoration: "none" }}>
-      {/* IMAGE */}
+    <Link href={href} className="card card-hover" style={{ overflow: "hidden" }}>
       <div className="card-img" style={{ position: "relative" }}>
         <Image
           src={imageUrl}
           alt={title}
           width={900}
           height={600}
-          style={{ width: "100%", height: 190, objectFit: "cover" }}
-          priority={false}
+          style={{ width: "100%", height: 200, objectFit: "cover" }}
         />
-
-        {/* premium overlay gradient */}
         <div
-          aria-hidden="true"
           style={{
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.55) 100%)",
+              "linear-gradient(180deg, rgba(15,23,42,0) 20%, rgba(15,23,42,0.35) 100%)",
           }}
         />
-
-        {/* top chips */}
         <div
           style={{
             position: "absolute",
-            top: 12,
-            left: 12,
-            right: 12,
+            inset: "16px 16px auto 16px",
             display: "flex",
             justifyContent: "space-between",
-            gap: 10,
+            gap: 8,
           }}
         >
-          <span className={`badge ${trustTone}`} style={{ boxShadow: "var(--shGlow)" }}>
-            Trust {trustPercent}%
-          </span>
-
+          <span className={`badge ${trustTone}`}>Trust {trustPercent}%</span>
           {escrowOn ? (
-            <span className="badge badge-good ring-glow">Escrow</span>
+            <span className="badge badge-good">Escrow</span>
           ) : (
             <span className="badge badge-warn">No escrow</span>
           )}
         </div>
-
-        {/* bottom price pop */}
-        <div
-          style={{
-            position: "absolute",
-            left: 12,
-            bottom: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <span
-            className="glass"
-            style={{
-              padding: "8px 10px",
-              borderRadius: 14,
-              border: "1px solid rgba(255,255,255,0.16)",
-              background: "rgba(10,16,36,0.62)",
-              boxShadow: "var(--shPop)",
-              fontWeight: 950,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {priceLabel}
-          </span>
-
-          <span className="badge">{delivery}</span>
-        </div>
       </div>
 
-      {/* BODY */}
-      <div style={{ padding: 16 }} className="stack-10">
+      <div className="stack-10" style={{ padding: 18 }}>
         <div className="stack-6">
-          <div
-            style={{
-              fontWeight: 900,
-              letterSpacing: "-0.015em",
-              lineHeight: 1.15,
-              fontSize: "1.02rem",
-            }}
-          >
-            {title}
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <span className="muted" style={{ fontSize: ".86rem" }}>
-              by <span style={{ color: "var(--txt1)", fontWeight: 780 }}>{sellerName}</span>
+          <div style={{ fontWeight: 600, fontSize: "1rem" }}>{title}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="muted" style={{ fontSize: "0.85rem" }}>
+              by <strong>{sellerName}</strong>
             </span>
-
             {sellerVerified && <span className="badge badge-blue">Verified</span>}
-
-            <span className="badge">
-              {reviewCount} reviews
-            </span>
+            <span className="badge">{reviewCount} reviews</span>
           </div>
         </div>
 
-        {/* bottom action hint */}
         <div
-          className="surface glass"
+          className="surface"
           style={{
-            padding: 10,
-            borderRadius: 16,
+            padding: 12,
+            borderRadius: 14,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            border: "1px solid rgba(255,255,255,0.10)",
           }}
         >
-          <span className="muted" style={{ fontSize: ".86rem" }}>
-            View listing
-          </span>
-          <span className="badge badge-blue">Open</span>
+          <span style={{ fontWeight: 600 }}>{priceLabel}</span>
+          <span className="badge">{delivery}</span>
         </div>
       </div>
     </Link>
