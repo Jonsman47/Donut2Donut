@@ -34,6 +34,34 @@
   --focus: 0 0 0 3px rgba(29, 78, 216, 0.2);
 
   --max: 1160px;
+  --hero-bg: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+  --header-bg: rgba(247, 249, 252, 0.9);
+}
+
+[data-theme="dark"] {
+  --bg: #0b0f1a;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border: #243045;
+  --border-strong: #334155;
+
+  --text: #f8fafc;
+  --text-muted: #9aa4b2;
+
+  --primary: #60a5fa;
+  --primary-strong: #3b82f6;
+  --primary-soft: rgba(96, 165, 250, 0.18);
+  --accent: #38bdf8;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.35);
+  --shadow-sm: 0 8px 24px rgba(2, 6, 23, 0.4);
+  --shadow-md: 0 16px 40px rgba(2, 6, 23, 0.5);
+  --shadow-hover: 0 20px 60px rgba(2, 6, 23, 0.6);
+
+  --focus: 0 0 0 3px rgba(96, 165, 250, 0.35);
+
+  --hero-bg: linear-gradient(180deg, #0f172a 0%, #101b2e 100%);
+  --header-bg: rgba(11, 15, 26, 0.9);
 }
 
 * {
@@ -49,9 +77,14 @@ body {
   margin: 0;
   color: var(--text);
   background: var(--bg);
+  color-scheme: light;
   font-feature-settings: "ss01";
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+[data-theme="dark"] body {
+  color-scheme: dark;
 }
 
 a {
@@ -347,7 +380,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 11px 12px;
-  background: white;
+  background: var(--surface);
   color: var(--text);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -409,7 +442,7 @@ textarea::placeholder {
   top: 0;
   z-index: 50;
   backdrop-filter: blur(16px);
-  background: rgba(247, 249, 252, 0.9);
+  background: var(--header-bg);
   border-bottom: 1px solid var(--border);
 }
 
@@ -454,7 +487,7 @@ textarea::placeholder {
 
 .site-footer {
   border-top: 1px solid var(--border);
-  background: white;
+  background: var(--surface);
   padding: 32px 0;
 }
 
@@ -486,7 +519,7 @@ textarea::placeholder {
 .hero {
   border-radius: var(--radius-xl);
   padding: 48px;
-  background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+  background: var(--hero-bg);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-md);
 }
