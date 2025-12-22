@@ -32,7 +32,7 @@ export default function Home() {
 
             <div className="hero-image">
               <Image
-                src={getDonutImage(2)}
+                src={getDonutImage(0)}
                 alt="Donut2Donut hero"
                 width={900}
                 height={700}
