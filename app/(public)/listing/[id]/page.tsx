@@ -58,6 +58,25 @@ export default async function ListingPage({ params }: PageProps) {
                   priority
                 />
               </div>
+              {listing.imageUrls && listing.imageUrls.length > 1 && (
+                <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
+                  {listing.imageUrls.map((url, index) => (
+                    <Image
+                      key={`${url}-${index}`}
+                      src={url || getDonutImage(1)}
+                      alt={`${listing.title} ${index + 1}`}
+                      width={220}
+                      height={140}
+                      style={{
+                        width: 160,
+                        height: 110,
+                        objectFit: "cover",
+                        borderRadius: 10,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
               <div className="stack-8">
                 <span className="kicker">Listing</span>
                 <h1 className="h2">{listing.title}</h1>
