@@ -1,493 +1,378 @@
 "use client";
+
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getListingById } from "@/lib/demo";
+import { ListingActions } from "./ListingActions";
 
 type PageProps = {
   params: { id: string };
 };
 
+type TradeStage =
+  | "REQUEST"
+  | "ACCEPT"
+  | "PAY"
+  | "INGAME"
+  | "PROOFS"
+  | "COMPLETE"
+  | "DISPUTE";
+
 export default async function ListingPage({ params }: PageProps) {
   const listing = await getListingById(params.id);
   if (!listing) return notFound();
 
+  // Pour l'instant : stage fixe (mock)
+  const stage: TradeStage = "REQUEST";
+
   return (
-    <div className="listing-page">
-      {/* MAIN GRID */}
-      <section className="listing-grid">
-        {/* LEFT */}
-        <div className="listing-left">
-          <div className="media-card">
-            <div className="media">
-              <Image
-                src={listing.imageUrl}
-                alt={listing.title}
-                width={1400}
-                height={900}
-                className="media-img"
-                priority
-              />
-            </div>
-          </div>
+    <div style={{ paddingTop: 86 }}>
+      <section className="container section-tight">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.4fr .8fr",
+            gap: 16,
+          }}
+        >
+          {/* LEFT : annonce + flow */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Media + titre */}
+            <div
+              className="surface glass border-grad"
+              style={{ padding: 12, borderRadius: 22 }}
+            >
+              <div
+                style={{
+                  borderRadius: 18,
+                  overflow: "hidden",
+                  marginBottom: 10,
+                }}
+              >
+                <Image
+                  src={listing.imageUrl}
+                  alt={listing.title}
+                  width={1400}
+                  height={900}
+                  style={{
+                    width: "100%",
+                    height: 260,
+                    objectFit: "cover",
+                  }}
+                  priority
+                />
+              </div>
 
-          <div className="card">
-            <h1 className="title">{listing.title}</h1>
-            <p className="muted">
-              Payment is held in escrow. Seller must upload proof. You confirm or dispute.
-            </p>
+              <div className="stack-6">
+                <div className="kicker">Annonce DonutSMP</div>
+                <h1
+                  className="h1"
+                  style={{ fontSize: 22, fontWeight: 950, margin: 0 }}
+                >
+                  {listing.title}
+                </h1>
+                <p
+                  className="p"
+                  style={{ fontSize: 14, color: "#9ca3af", margin: 0 }}
+                >
+                  Trade encadré par escrow : demande d&apos;achat, acceptation,
+                  paiement, échange in‑game, preuves vidéo et litiges 48h.
+                </p>
 
-            <div className="headline-row">
-              <span className="pill on">Escrow ON</span>
-              <span className="pill dim">Dispute: 48h</span>
-              <span className="pill dim">{listing.delivery}</span>
-              {listing.tags?.[0] ? <span className="pill dim">{listing.tags[0]}</span> : null}
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 className="h">What you receive</h2>
-            <ul className="list">
-              <li>Exactly what’s listed (no bait swaps)</li>
-              <li>Delivery via agreed method</li>
-              <li>Proof uploaded by seller</li>
-              <li>Dispute window if something’s off</li>
-            </ul>
-          </div>
-
-          <div className="card">
-            <h2 className="h">Delivery & rules</h2>
-
-            <div className="kv">
-              <span>Delivery</span>
-              <strong>{listing.delivery}</strong>
-            </div>
-
-            <div className="kv">
-              <span>Seller proof required</span>
-              <strong>Yes</strong>
-            </div>
-
-            <div className="kv">
-              <span>Escrow release</span>
-              <strong>After confirmation</strong>
-            </div>
-
-            <div className="kv">
-              <span>Dispute window</span>
-              <strong>48 hours</strong>
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 className="h">Seller</h2>
-
-            <div className="seller-card">
-              <div className="avatar" />
-              <div className="seller-meta">
-                <div className="seller-name">{listing.sellerName}</div>
-                <div className="seller-sub">
-                  {listing.trustPercent}% trust • {listing.reviewCount} reviews
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    marginTop: 6,
+                  }}
+                >
+                  <span className="badge badge-good">Escrow ON</span>
+                  <span className="badge">Preuves vidéo requises</span>
+                  <span className="badge">Litige 48h</span>
+                  <span className="badge">
+                    Livraison : {listing.delivery}
+                  </span>
                 </div>
               </div>
-
-              {listing.sellerVerified ? (
-                <span className="badge verify">Verified</span>
-              ) : (
-                <span className="badge dimBadge">Standard</span>
-              )}
             </div>
 
-            <div className="seller-grid">
-              <div className="seller-stat">
-                <div className="k">Trust</div>
-                <div className="v">{listing.trustPercent}%</div>
+            {/* Flow 4 étapes + litiges */}
+            <div className="surface glass" style={{ padding: 14, borderRadius: 22 }}>
+              <div className="stack-8">
+                <div className="kicker">Flow de trade</div>
+                <h2 className="h2" style={{ fontSize: 18, margin: 0 }}>
+                  Comment ce trade va se dérouler
+                </h2>
+
+                <div className="stack-6">
+                  <TradeStep
+                    step="Étape 1"
+                    title="Mise en vente & demande d'achat"
+                    active={stage === "REQUEST"}
+                    description="Le vendeur liste l'item (pioche, kit, service) avec pseudo Minecraft et prix. L'acheteur envoie une demande d'achat depuis cette page."
+                  />
+                  <TradeStep
+                    step="Étape 2"
+                    title="Acceptation & paiement escrow"
+                    active={stage === "ACCEPT" || stage === "PAY"}
+                    description="Le vendeur accepte la demande. L'acheteur paie via le site, l'argent est bloqué en escrow. Un code d'échange unique est généré pour ce trade."
+                  />
+                  <TradeStep
+                    step="Étape 3"
+                    title="Échange in‑game discret"
+                    active={stage === "INGAME"}
+                    description="Les deux joueurs se connectent sur Donut SMP (alts, coords, ender chest) et font l'échange sans /trade visible. Chacun enregistre une courte vidéo."
+                  />
+                  <TradeStep
+                    step="Étape 4"
+                    title="Validation, libération & litiges"
+                    active={stage === "PROOFS" || stage === "COMPLETE"}
+                    description="Les preuves vidéo sont upload sur le site et les deux cliquent “Échange OK”. Si tout est clean, l'escrow paie le vendeur. Sinon, un litige peut être ouvert pendant 48h."
+                  />
+                  <TradeStep
+                    step="Litiges"
+                    title="Scam & résolution"
+                    active={stage === "DISPUTE"}
+                    description="Si un joueur ne respecte pas les règles (pas de vidéo, item manquant...), l'autre peut ouvrir un litige. Les preuves sont analysées, l'argent va à la victime et le scammeur est blacklisté."
+                  />
+                </div>
               </div>
-              <div className="seller-stat">
-                <div className="k">Reviews</div>
-                <div className="v">{listing.reviewCount}</div>
+            </div>
+
+            {/* Vendeur / confiance */}
+            <div className="surface glass" style={{ padding: 14, borderRadius: 22 }}>
+              <h2 className="h2" style={{ fontSize: 16, marginBottom: 8 }}>
+                Vendeur & confiance
+              </h2>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 999,
+                    background:
+                      "radial-gradient(circle at 30% 30%, rgba(120,220,255,.24), rgba(10,16,32,.6))",
+                    border: "1px solid rgba(120,170,255,.18)",
+                  }}
+                />
+                <div>
+                  <div style={{ fontWeight: 900 }}>{listing.sellerName}</div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                    }}
+                  >
+                    {listing.trustPercent}% trust • {listing.reviewCount} reviews
+                  </div>
+                </div>
+                <span
+                  className="badge"
+                  style={{ marginLeft: "auto", fontSize: 11 }}
+                >
+                  {listing.sellerVerified ? "Vendeur vérifié" : "Vendeur standard"}
+                </span>
               </div>
-              <div className="seller-stat">
-                <div className="k">Delivery</div>
-                <div className="v">{listing.delivery}</div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gap: 8,
+                }}
+              >
+                <StatBox label="Trust" value={`${listing.trustPercent}%`} />
+                <StatBox
+                  label="Avis"
+                  value={listing.reviewCount.toString()}
+                />
+                <StatBox label="Livraison" value={listing.delivery} />
               </div>
             </div>
           </div>
 
-          <div className="card">
-            <h2 className="h">Reviews (demo)</h2>
-            <div className="review">
-              <div className="r-top">
-                <strong>buyer_neo</strong>
-                <span className="r-pill">Verified purchase</span>
+          {/* RIGHT : bloc trade / actions */}
+          <aside
+            style={{
+              position: "sticky",
+              top: 90,
+              alignSelf: "flex-start",
+            }}
+          >
+            <div
+              className="surface-strong glass border-grad"
+              style={{ padding: 16, borderRadius: 22 }}
+            >
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 950,
+                  marginBottom: 4,
+                }}
+              >
+                {listing.priceLabel}
               </div>
-              <p className="r-text">
-                Clean delivery. Proof was instant. Felt safe.
-              </p>
-            </div>
-            <div className="review">
-              <div className="r-top">
-                <strong>skullbyte</strong>
-                <span className="r-pill">Fast</span>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#9ca3af",
+                  marginBottom: 10,
+                }}
+              >
+                Prix indicatif de cette annonce démo. Plus tard, ce montant sera
+                lié à une commande escrow réelle (Order) avec paiement et code
+                d&apos;échange.
               </div>
-              <p className="r-text">
-                Got it quick. Would buy again.
-              </p>
+
+              {/* À terme : quantité + total */}
+              <div
+                style={{
+                  marginBottom: 12,
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                  Quantité (mock)
+                </span>
+                <input
+                  className="input"
+                  defaultValue={1}
+                  style={{ width: 60, padding: 6, fontSize: 13 }}
+                />
+              </div>
+
+              {/* Actions : Étape 1 réelle + reste mock */}
+              <div className="stack-8">
+                <ListingActions listingId={listing.id} />
+
+                <button className="btn btn-ghost" style={{ width: "100%" }}>
+                  Étape 2 · (Vendeur) Accepter la demande (mock)
+                </button>
+                <button className="btn btn-ghost" style={{ width: "100%" }}>
+                  Étape 3 · (Acheteur) Payer et recevoir le code (mock)
+                </button>
+                <button className="btn btn-ghost" style={{ width: "100%" }}>
+                  Étape 4 · Uploader les preuves & confirmer (mock)
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  style={{ width: "100%", marginTop: 4 }}
+                >
+                  Ouvrir un litige (mock)
+                </button>
+              </div>
+
+              <div
+                className="p"
+                style={{
+                  fontSize: 11,
+                  color: "#9ca3af",
+                  marginTop: 10,
+                }}
+              >
+                Quand on branchera Prisma et les Orders, ces boutons mettront à
+                jour le statut du trade (REQUESTED, PAID, INGAME, COMPLETED,
+                DISPUTED…) et déclencheront le payout ou le refund.
+              </div>
             </div>
-          </div>
+          </aside>
         </div>
-
-        {/* RIGHT */}
-        <aside className="listing-right">
-          <div className="buy-card">
-            <div className="price">{listing.priceLabel}</div>
-
-            <div className="qty">
-              <button aria-label="Decrease quantity">-</button>
-              <input aria-label="Quantity" defaultValue={1} />
-              <button aria-label="Increase quantity">+</button>
-            </div>
-
-            <button className="buy-btn">Buy now</button>
-
-            <div className="safe">
-              <span className="pill on">Escrow ON</span>
-              <span className="pill dim">Dispute 48h</span>
-              <span className="pill dim">Proof required</span>
-            </div>
-
-            <div className="icons">
-              <span>🔒 Secure</span>
-              <span>⚡ Fast</span>
-              <span>🛡️ Protected</span>
-            </div>
-
-            <div className="note">
-              Seller gets paid after delivery is confirmed. If something’s off, dispute within 48h.
-            </div>
-          </div>
-        </aside>
       </section>
+    </div>
+  );
+}
 
-      {/* MOBILE STICKY BUY */}
-      <div className="mobile-buy">
-        <div className="mobile-price">{listing.priceLabel}</div>
-        <button className="mobile-btn">Buy now</button>
+type TradeStepProps = {
+  step: string;
+  title: string;
+  description: string;
+  active: boolean;
+};
+
+function TradeStep({ step, title, description, active }: TradeStepProps) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "flex-start",
+        opacity: active ? 1 : 0.75,
+      }}
+    >
+      <div
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 999,
+          border: "2px solid rgba(120,170,255,0.6)",
+          background: active
+            ? "rgba(120,170,255,0.2)"
+            : "rgba(10,16,32,0.6)",
+          marginTop: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 10,
+          fontWeight: 900,
+          color: "#e5f3ff",
+        }}
+      >
+        {step.replace("Étape ", "")}
       </div>
+      <div>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            marginBottom: 2,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: "#9ca3af",
+          }}
+        >
+          {description}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-      <style jsx>{`
-        .listing-page{
-          display:flex;
-          flex-direction:column;
-          gap: 16px;
-        }
-
-        .listing-grid{
-          display:grid;
-          grid-template-columns: 1.4fr .8fr;
-          gap: 14px;
-        }
-
-        .listing-left{
-          display:flex;
-          flex-direction:column;
-          gap: 12px;
-        }
-
-        .media-card{
-          border-radius: 24px;
-          overflow:hidden;
-          border: 1px solid rgba(120,170,255,.14);
-          background: rgba(14,22,40,.54);
-          box-shadow: 0 24px 90px rgba(0,0,0,.38);
-        }
-
-        .media{
-          height: 320px;
-          overflow:hidden;
-        }
-
-        .media-img{
-          width:100%;
-          height:100%;
-          object-fit:cover;
-          filter: blur(1px) saturate(1.05);
-          transform: scale(1.06);
-        }
-
-        .card{
-          border-radius: 22px;
-          padding: 14px;
-          background: rgba(10,16,32,.38);
-          border: 1px solid rgba(120,170,255,.12);
-          box-shadow: 0 16px 60px rgba(0,0,0,.26);
-        }
-
-        .title{
-          margin:0;
-          font-size: 22px;
-          font-weight: 950;
-        }
-
-        .muted{
-          color: rgba(234,241,255,.70);
-          margin-top: 6px;
-          font-size: 14px;
-        }
-
-        .headline-row{
-          display:flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          margin-top: 10px;
-        }
-
-        .h{
-          margin:0 0 8px;
-          font-size: 16px;
-          font-weight: 950;
-        }
-
-        .list{
-          padding-left: 18px;
-          margin:0;
-          display:flex;
-          flex-direction:column;
-          gap: 6px;
-        }
-
-        .kv{
-          display:flex;
-          justify-content:space-between;
-          padding: 8px 0;
-          border-bottom: 1px solid rgba(120,170,255,.08);
-        }
-
-        .seller-card{
-          display:flex;
-          align-items:center;
-          gap: 10px;
-        }
-
-        .avatar{
-          width: 44px;
-          height: 44px;
-          border-radius: 999px;
-          background: radial-gradient(circle at 30% 30%, rgba(120,220,255,.24), rgba(10,16,32,.6));
-          border: 1px solid rgba(120,170,255,.18);
-        }
-
-        .seller-name{
-          font-weight: 950;
-        }
-
-        .seller-sub{
-          font-size: 12px;
-          color: rgba(234,241,255,.70);
-        }
-
-        .badge{
-          margin-left:auto;
-          padding: 6px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(120,170,255,.16);
-          font-weight: 900;
-          font-size: 12px;
-          background: rgba(10,16,32,.34);
-        }
-
-        .verify{
-          background: rgba(120,220,255,.10);
-        }
-
-        .dimBadge{
-          opacity: .85;
-        }
-
-        .seller-grid{
-          display:grid;
-          grid-template-columns: repeat(3, minmax(0,1fr));
-          gap: 8px;
-          margin-top: 12px;
-        }
-
-        .seller-stat{
-          border-radius: 18px;
-          padding: 10px 10px;
-          border: 1px solid rgba(120,170,255,.10);
-          background: rgba(10,16,32,.28);
-        }
-        .k{
-          font-size: 12px;
-          color: rgba(234,241,255,.68);
-          font-weight: 850;
-        }
-        .v{
-          margin-top: 4px;
-          font-weight: 950;
-          font-size: 14px;
-        }
-
-        .review{
-          border-radius: 18px;
-          padding: 12px 12px;
-          border: 1px solid rgba(120,170,255,.10);
-          background: rgba(10,16,32,.28);
-          margin-top: 8px;
-        }
-        .r-top{
-          display:flex;
-          justify-content:space-between;
-          align-items:center;
-          gap: 10px;
-        }
-        .r-pill{
-          padding: 6px 10px;
-          border-radius: 999px;
-          font-size: 12px;
-          font-weight: 900;
-          border: 1px solid rgba(120,170,255,.12);
-          background: rgba(120,170,255,.08);
-        }
-        .r-text{
-          margin: 8px 0 0;
-          color: rgba(234,241,255,.72);
-          font-size: 13px;
-          line-height: 1.4;
-        }
-
-        .listing-right{
-          position: sticky;
-          top: 90px;
-          height: fit-content;
-        }
-
-        .buy-card{
-          border-radius: 24px;
-          padding: 16px;
-          background: linear-gradient(180deg, rgba(14,22,40,.62), rgba(14,22,40,.46));
-          border: 1px solid rgba(120,170,255,.18);
-          box-shadow: 0 24px 100px rgba(0,0,0,.40);
-          display:flex;
-          flex-direction:column;
-          gap: 12px;
-        }
-
-        .price{
-          font-size: 26px;
-          font-weight: 950;
-        }
-
-        .qty{
-          display:flex;
-          gap: 8px;
-          align-items:center;
-        }
-
-        .qty button{
-          width: 34px;
-          height: 34px;
-          border-radius: 12px;
-          border: 1px solid rgba(120,170,255,.16);
-          background: rgba(10,16,32,.44);
-          color: #eaf1ff;
-          font-weight: 900;
-          cursor:pointer;
-        }
-
-        .qty input{
-          width: 56px;
-          text-align:center;
-          border-radius: 12px;
-          border: 1px solid rgba(120,170,255,.16);
-          background: rgba(10,16,32,.44);
-          color:#eaf1ff;
-          font-weight: 900;
-          padding: 10px 0;
-        }
-
-        .buy-btn{
-          padding: 14px;
-          border-radius: 18px;
-          font-weight: 950;
-          border: 1px solid rgba(120,220,255,.22);
-          background: linear-gradient(180deg, rgba(120,220,255,.26), rgba(120,170,255,.14));
-          box-shadow: 0 18px 70px rgba(0,0,0,.30);
-          cursor:pointer;
-        }
-
-        .safe{
-          display:flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .pill{
-          padding: 7px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(120,170,255,.14);
-          font-weight: 900;
-          font-size: 12px;
-        }
-
-        .on{
-          background: rgba(120,220,255,.10);
-        }
-
-        .dim{
-          background: rgba(10,16,32,.32);
-          color: rgba(234,241,255,.70);
-        }
-
-        .icons{
-          display:flex;
-          justify-content:space-between;
-          font-size: 12px;
-          color: rgba(234,241,255,.70);
-        }
-
-        .note{
-          font-size: 12px;
-          color: rgba(234,241,255,.68);
-          line-height: 1.4;
-          border-top: 1px solid rgba(120,170,255,.10);
-          padding-top: 10px;
-        }
-
-        .mobile-buy{
-          display:none;
-        }
-
-        @media (max-width: 900px){
-          .listing-grid{
-            grid-template-columns: 1fr;
-          }
-          .listing-right{
-            position: static;
-          }
-        }
-
-        @media (max-width: 520px){
-          .mobile-buy{
-            position: sticky;
-            bottom: 0;
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            gap: 10px;
-            padding: 12px;
-            background: rgba(10,16,32,.88);
-            border-top: 1px solid rgba(120,170,255,.18);
-          }
-          .mobile-btn{
-            padding: 12px 16px;
-            border-radius: 14px;
-            font-weight: 950;
-            border: 1px solid rgba(120,220,255,.22);
-            background: linear-gradient(180deg, rgba(120,220,255,.26), rgba(120,170,255,.14));
-            cursor:pointer;
-          }
-        }
-      `}</style>
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        padding: 10,
+        border: "1px solid rgba(120,170,255,.12)",
+        background: "rgba(10,16,32,.32)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          color: "#9ca3af",
+          textTransform: "uppercase",
+          letterSpacing: ".06em",
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ marginTop: 4, fontWeight: 950, fontSize: 14 }}>{value}</div>
     </div>
   );
 }

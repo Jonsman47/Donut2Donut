@@ -1,66 +1,70 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { platformFeeCents, makeSafeTradeCode } from "@/lib/policies";
-import { requireUser } from "@/lib/auth";
-import { createPaymentIntentForEscrow } from "@/lib/stripe";
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-export async function POST(req: Request) {
-  let user;
-  try {
-    user = await requireUser();
-  } catch {
-    return NextResponse.json({ error: "Login required" }, { status: 401 });
+function generateSafeTradeCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "D2D-";
+  for (let i = 0; i < 6; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.id) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { listingId, quantity = 1 } = body;
+  const buyerId = session.user.id as string;
 
-  const listing = await db.listing.findUnique({ where: { id: listingId }, include: { seller: { include: { sellerProfile: true } } } });
-  if (!listing || !listing.active) return NextResponse.json({ error: "Listing not found" }, { status: 404 });
-
-  const sellerProfile = listing.seller.sellerProfile;
-  if (!sellerProfile) return NextResponse.json({ error: "Seller not enabled" }, { status: 400 });
-
-  const subtotal = listing.priceCents * quantity;
-  const fee = platformFeeCents(subtotal);
-  const total = subtotal; // show fee included or separate in UI
-
-  if (listing.priceCents > sellerProfile.maxPriceCents) {
-    return NextResponse.json({ error: "Seller trust too low for this price cap" }, { status: 403 });
+  const body = await req.json().catch(() => null);
+  if (!body || !body.listingId) {
+    return NextResponse.json({ error: "listingId is required" }, { status: 400 });
   }
 
-  const now = new Date();
-  const disputeHours = 48;
-  const buyerDisputeDeadline = new Date(now.getTime() + disputeHours * 60 * 60 * 1000);
-  const safeTradeCode = makeSafeTradeCode();
+  const quantity = body.quantity && body.quantity > 0 ? body.quantity : 1;
 
-  const order = await db.order.create({
+  const listing = await prisma.listing.findUnique({
+    where: { id: body.listingId },
+  });
+
+  if (!listing) {
+    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+  }
+
+  if (listing.sellerId === buyerId) {
+    return NextResponse.json(
+      { error: "Tu ne peux pas acheter ta propre annonce." },
+      { status: 400 }
+    );
+  }
+
+  const unitPriceCents = listing.priceCents;
+  const subtotalCents = unitPriceCents * quantity;
+  const platformFeeCents = Math.round(subtotalCents * 0.1);
+  const totalCents = subtotalCents + platformFeeCents;
+
+  const safeTradeCode = generateSafeTradeCode();
+  const buyerDisputeDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+  const order = await prisma.order.create({
     data: {
-      buyerId: user.id,
+      buyerId,
       sellerId: listing.sellerId,
       listingId: listing.id,
       quantity,
-      unitPriceCents: listing.priceCents,
-      subtotalCents: subtotal,
-      platformFeeCents: fee,
-      totalCents: total,
-      status: "AWAITING_SELLER_ACCEPT",
+      unitPriceCents,
+      subtotalCents,
+      platformFeeCents,
+      totalCents,
+      status: "PAID",
       safeTradeCode,
       buyerDisputeDeadline,
     },
   });
 
-  const pi = await createPaymentIntentForEscrow({
-    orderId: order.id,
-    amountCents: total,
-    currency: listing.currency,
-    buyerEmail: user.email ?? undefined,
-  });
-
-  await db.order.update({
-    where: { id: order.id },
-    data: { stripePaymentIntentId: pi.id, escrowFundedAt: new Date(), status: "PAID" },
-  });
-
-  return NextResponse.json({ orderId: order.id, clientSecret: (pi as any).client_secret ?? null });
+  return NextResponse.json({ order });
 }
