@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useSession, signIn } from "next-auth/react";
 
 export function ListingActions({ listingId }: { listingId: string }) {
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [messaging, setMessaging] = useState(false);
 
   async function handleRequest() {
     try {
@@ -28,13 +31,44 @@ export function ListingActions({ listingId }: { listingId: string }) {
       }
 
       const data = await res.json();
-      setInfo(
-        `Commande créée ! Code d'échange : ${data.order.safeTradeCode} (status: ${data.order.status})`
-      );
+      window.location.href = `/market/orders/${data.order.id}`;
     } catch (err: any) {
       setError(err.message || "Erreur inconnue");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleMessageSeller() {
+    if (!session?.user?.id) {
+      signIn(undefined, { callbackUrl: `/listing/${listingId}` });
+      return;
+    }
+
+    try {
+      setMessaging(true);
+      setError(null);
+
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as any).error || "Failed to start conversation");
+      }
+
+      const data = await res.json();
+      const template = encodeURIComponent(
+        "Hi, I’m interested in this listing. Is it still available?"
+      );
+      window.location.href = `/market/messages/${data.conversation.id}?prefill=${template}`;
+    } catch (err: any) {
+      setError(err.message || "Erreur inconnue");
+    } finally {
+      setMessaging(false);
     }
   }
 
@@ -76,11 +110,21 @@ export function ListingActions({ listingId }: { listingId: string }) {
         className="btn btn-primary"
         style={{ width: "100%" }}
         onClick={handleRequest}
-        disabled={loading || deleting}
+        disabled={loading || deleting || messaging}
       >
         {loading
           ? "Création de la demande d'achat..."
           : "Étape 1 · Envoyer une demande d'achat"}
+      </button>
+
+      <button
+        className="btn btn-secondary"
+        style={{ width: "100%" }}
+        type="button"
+        onClick={handleMessageSeller}
+        disabled={loading || deleting || messaging}
+      >
+        {messaging ? "Ouverture du message..." : "Message seller"}
       </button>
 
       {/* Nouveau bouton : supprimer l'annonce */}
@@ -89,7 +133,7 @@ export function ListingActions({ listingId }: { listingId: string }) {
         style={{ width: "100%" }}
         type="button"
         onClick={handleDelete}
-        disabled={loading || deleting}
+        disabled={loading || deleting || messaging}
       >
         {deleting ? "Suppression en cours..." : "Supprimer l’annonce"}
       </button>
