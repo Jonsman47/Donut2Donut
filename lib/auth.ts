@@ -13,7 +13,7 @@ type TokenShape = {
   discordId?: string;
 };
 
-function slugUsername(input: string): string {  
+function slugUsername(input: string): string {
   return input
     .trim()
     .toLowerCase()
@@ -47,7 +47,8 @@ async function upsertDiscordUser(params: {
 
   const byDiscord = await db.user.findUnique({ where: { discordId } });
   if (byDiscord) {
-    const nextUsername = byDiscord.username || (await ensureUniqueUsername(username));
+    const nextUsername =
+      byDiscord.username || (await ensureUniqueUsername(username));
     const user = await db.user.update({
       where: { id: byDiscord.id },
       data: {
@@ -79,39 +80,33 @@ async function upsertDiscordUser(params: {
 }
 
 export const authOptions: NextAuthOptions = {
-  debug: true,
+  debug: false,
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
   pages: { signIn: "/login" },
   providers: [
+    // DEV ONLY: login par username existant (seller-demo, buyer-demo, etc.)
     ...(process.env.NODE_ENV === "development"
       ? [
           CredentialsProvider({
             name: "Dev Login",
             credentials: {
               username: { label: "Username", type: "text" },
-              email: { label: "Email", type: "email" },
             },
             async authorize(credentials) {
               const schema = z.object({
                 username: z.string().min(2).max(24),
-                email: z.string().email().optional().or(z.literal("")),
               });
               const parsed = schema.safeParse(credentials);
               if (!parsed.success) return null;
 
-              const username = await ensureUniqueUsername(parsed.data.username);
-              const email = parsed.data.email ? parsed.data.email.toLowerCase() : null;
+              const username = parsed.data.username.toLowerCase();
 
-              let user = await db.user.findUnique({ where: { username } });
+              // On NE crée plus de user ici, on cherche un user existant
+              const user = await db.user.findUnique({ where: { username } });
               if (!user) {
-                user = await db.user.create({
-                  data: {
-                    username,
-                    email: email ?? undefined,
-                    sellerProfile: { create: {} },
-                  },
-                });
+                // si l'utilisateur n'existe pas, on refuse le login
+                return null;
               }
 
               return {
@@ -142,7 +137,9 @@ export const authOptions: NextAuthOptions = {
       if (!discordId) return false;
 
       const usernameRaw =
-        (profile as any)?.global_name || (profile as any)?.username || "user";
+        (profile as any)?.global_name ||
+        (profile as any)?.username ||
+        "user";
       const email = (profile as any)?.email as string | undefined;
 
       const avatarHash = (profile as any)?.avatar as string | null | undefined;

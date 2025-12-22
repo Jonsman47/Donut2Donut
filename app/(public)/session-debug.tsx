@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 
 export function SessionDebug() {
   const { data: session, status } = useSession();
@@ -40,6 +40,7 @@ export function SessionDebug() {
           gap: 8,
         }}
       >
+        {/* Compte acheteur */}
         <button
           style={{
             padding: "6px 10px",
@@ -52,15 +53,16 @@ export function SessionDebug() {
           }}
           onClick={() =>
             signIn("credentials", {
-              username: "buyer_demo", // adapte à ton user acheteur
-              email: "buyer@example.com",
-              callbackUrl: "/",
+              redirect: false,
+              username: "buyer-demo", // nom EXACT dans ta DB
+              // ajoute ici password si ton provider en a besoin
             })
           }
         >
-          Se connecter en Compte 1 (acheteur)
+          Se connecter en buyer-demo
         </button>
 
+        {/* Compte vendeur */}
         <button
           style={{
             padding: "6px 10px",
@@ -73,13 +75,29 @@ export function SessionDebug() {
           }}
           onClick={() =>
             signIn("credentials", {
-              username: "seller_demo", // adapte à ton user vendeur
-              email: "seller@example.com",
-              callbackUrl: "/",
+              redirect: false,
+              username: "seller-demo", // nom EXACT dans ta DB
+              // ajoute ici password si ton provider en a besoin
             })
           }
         >
-          Se connecter en Compte 2 (vendeur)
+          Se connecter en seller-demo
+        </button>
+
+        {/* Déconnexion */}
+        <button
+          style={{
+            padding: "6px 10px",
+            borderRadius: 4,
+            border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(127,29,29,0.9)",
+            color: "white",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+          onClick={() => signOut({ redirect: false })}
+        >
+          Se déconnecter
         </button>
       </div>
     </div>

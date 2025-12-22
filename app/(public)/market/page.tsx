@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import items from "../../../lib/mc-items.json";
 
@@ -19,6 +20,7 @@ type Listing = {
   type: ListingType;
   quantity?: number;
   imagesCount: number;
+  sellerId: string;
 };
 
 function parsePrice(label: string) {
@@ -27,6 +29,9 @@ function parsePrice(label: string) {
 }
 
 export default function MarketPage() {
+  const { data: session } = useSession();
+  const userId = (session?.user as any)?.id;
+
   const [tab, setTab] = useState<Tab>("sales");
   const [query, setQuery] = useState("");
 
@@ -39,16 +44,50 @@ export default function MarketPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [myListings, setMyListings] = useState<Listing[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // --- Recherche dans les items du sélecteur ---
-  const [itemSearch, setItemSearch] = useState("");          // texte tapé
-  const [showDropdown, setShowDropdown] = useState(false);   // afficher/cacher la liste
+  const [allListings, setAllListings] = useState<Listing[]>([]);
+  const [loadingListings, setLoadingListings] = useState(true);
+
+  const [itemSearch, setItemSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
   const allItems = items.values as string[];
   const filteredItems = allItems.filter((name) =>
     name.toLowerCase().includes(itemSearch.toLowerCase())
   );
+
+  // Charger toutes les annonces quand la session change
+  useEffect(() => {
+    async function loadListings() {
+      try {
+        const res = await fetch("/api/listings");
+        const data = await res.json();
+
+        const mapped: Listing[] = data.listings.map((l: any) => ({
+          id: l.id,
+          title: l.title,
+          description: l.description,
+          priceLabel: (l.priceCents / 100).toFixed(2) + " €",
+          sellerName: l.seller?.username ?? "Unknown",
+          trustPercent: l.seller?.sellerProfile?.trustScore ?? 0,
+          reviewCount: 0,
+          imageUrl: l.images && l.images.length > 0 ? l.images[0].url : "/donut3.png",
+          type: l.deliveryType === "SERVICE" ? "service" : "item",
+          quantity: l.stock ?? undefined,
+          imagesCount: l.images?.length ?? 0,
+          sellerId: l.seller?.id ?? "",
+        }));
+
+        setAllListings(mapped);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingListings(false);
+      }
+    }
+
+    loadListings();
+  }, [userId, session]); // Re-load quand l'user change
 
   function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -67,7 +106,7 @@ export default function MarketPage() {
     setImagePreviews(newPreviews);
   }
 
-  function handleCreateOrUpdateListing() {
+  async function handleCreateOrUpdateListing() {
     setError(null);
 
     if (!title.trim()) {
@@ -93,14 +132,10 @@ export default function MarketPage() {
 
     const priceLabel = `${price.toFixed(2)} €`;
 
-    const coverUrl =
-      imagePreviews[0] ??
-      (editingId
-        ? myListings.find((l) => l.id === editingId)?.imageUrl ?? "/donut3.png"
-        : "/donut3.png");
+    const coverUrl = imagePreviews[0] ?? "/donut3.png";
 
     if (editingId) {
-      setMyListings((prev) =>
+      setAllListings((prev) =>
         prev.map((l) =>
           l.id === editingId
             ? {
@@ -119,26 +154,53 @@ export default function MarketPage() {
         )
       );
     } else {
-      const id = `local-${Date.now()}`;
+      try {
+        const res = await fetch("/api/listings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title:
+              listingType === "item"
+                ? `${quantity}x ${title.trim()}`
+                : title.trim(),
+            description: description.trim(),
+            whatYouGet: description.trim(),
+            priceCents: Math.round((price as number) * 100),
+            stock: listingType === "item" ? quantity : null,
+            deliveryType: listingType === "item" ? "INGAME_TRADE" : "SERVICE",
+          }),
+        });
 
-      const newListing: Listing = {
-        id,
-        title:
-          listingType === "item"
-            ? `${quantity}x ${title.trim()}`
-            : title.trim(),
-        description: description.trim(),
-        priceLabel,
-        sellerName: "You",
-        trustPercent: 100,
-        reviewCount: 0,
-        imageUrl: coverUrl,
-        type: listingType,
-        quantity: listingType === "item" ? quantity : undefined,
-        imagesCount: images.length,
-      };
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error || "Failed to create listing.");
+          return;
+        }
 
-      setMyListings((prev) => [...prev, newListing]);
+        const data = await res.json();
+
+        setAllListings((prev) => [
+          {
+            id: data.listing.id,
+            title: data.listing.title,
+            description: data.listing.description,
+            priceLabel: (data.listing.priceCents / 100).toFixed(2) + " €",
+            sellerName: session?.user?.name ?? "You",
+            trustPercent: 0,
+            reviewCount: 0,
+            imageUrl: coverUrl,
+            type: listingType,
+            quantity: listingType === "item" ? quantity : undefined,
+            imagesCount: images.length,
+            sellerId: userId ?? "",
+          },
+          ...prev,
+        ]);
+      } catch (e) {
+        console.error(e);
+        setError("Server error while creating listing.");
+        return;
+      }
     }
 
     resetForm();
@@ -173,7 +235,7 @@ export default function MarketPage() {
 
     setListingType(listing.type);
     setTitle(baseTitle);
-    setItemSearch(baseTitle); // remplir le champ de recherche avec le titre actuel
+    setItemSearch(baseTitle);
     setDescription(listing.description);
     setQuantity(listing.quantity ?? qty);
     const numericPrice = parsePrice(listing.priceLabel);
@@ -183,7 +245,35 @@ export default function MarketPage() {
     setError(null);
   }
 
-  const filteredSales = myListings
+  async function handleDelete(listingId: string) {
+    const ok = confirm("Tu es sûr de vouloir supprimer cette annonce ?");
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/listings/${listingId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(
+          (data as any).error || "Erreur lors de la suppression de l'annonce."
+        );
+        return;
+      }
+
+      setAllListings((prev) => prev.filter((l) => l.id !== listingId));
+    } catch (e) {
+      console.error(e);
+      alert("Server error while deleting listing.");
+    }
+  }
+
+  // Filtrer : "My listings" = celles du user connecté, "Buys" = celles des autres
+  const myListings = allListings.filter((l) => l.sellerId === userId);
+  const otherListings = allListings.filter((l) => l.sellerId !== userId);
+
+  const filteredSales = (tab === "sales" ? myListings : otherListings)
     .slice()
     .sort((a, b) => parsePrice(a.priceLabel) - parsePrice(b.priceLabel))
     .filter((l) => {
@@ -193,9 +283,7 @@ export default function MarketPage() {
       return haystack.includes(q);
     });
 
-  const filteredBuys: Listing[] = [];
-
-  const listToShow = tab === "sales" ? filteredSales : filteredBuys;
+  const listToShow = filteredSales;
 
   return (
     <div style={{ paddingTop: 86 }}>
@@ -247,7 +335,7 @@ export default function MarketPage() {
                       }}
                     >
                       <span>
-                        Current tab: {tab === "sales" ? "My listings" : "Buys"}
+                        Current tab: {tab === "sales" ? "My listings" : "Available listings"}
                       </span>
                       <span>Escrow • Proofs • 48h disputes</span>
                     </div>
@@ -272,7 +360,7 @@ export default function MarketPage() {
                 className={tab === "buys" ? "btn btn-soft" : "btn btn-ghost"}
                 onClick={() => setTab("buys")}
               >
-                Buys
+                Available listings
               </button>
             </div>
           </div>
@@ -328,325 +416,3 @@ export default function MarketPage() {
                           ? "btn btn-soft"
                           : "btn btn-ghost"
                       }
-                      onClick={() => setListingType("service")}
-                    >
-                      Service
-                    </button>
-                  </div>
-
-                  {/* Title: selector for items, text for services */}
-                  {listingType === "item" ? (
-                    <div className="stack-4" style={{ position: "relative" }}>
-                      <input
-                        className="input"
-                        placeholder="Select an item…"
-                        value={itemSearch || title}
-                        onChange={(e) => {
-                          setItemSearch(e.target.value);
-                          setShowDropdown(true);
-                        }}
-                        onFocus={() => {
-                          setShowDropdown(true);
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => setShowDropdown(false), 120);
-                        }}
-                      />
-
-                      {showDropdown && filteredItems.length > 0 && (
-                        <div className="dropdown-panel">
-                          {filteredItems.map((name) => (
-                            <button
-                              key={name}
-                              type="button"
-                              className="dropdown-item"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setTitle(name);
-                                setItemSearch(name);
-                                setShowDropdown(false);
-                              }}
-                            >
-                              {name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <input
-                      className="input"
-                      placeholder="Ex: Base building service"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                  )}
-
-                  <textarea
-                    className="input"
-                    rows={4}
-                    placeholder="Describe what you sell, how delivery works, and any requirements."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    style={{ resize: "vertical" }}
-                  />
-
-                  {listingType === "item" && (
-                    <input
-                      className="input"
-                      type="number"
-                      min={1}
-                      value={quantity}
-                      onChange={(e) =>
-                        setQuantity(Math.max(1, Number(e.target.value) || 1))
-                      }
-                      placeholder="Quantity"
-                      style={{ maxWidth: 160 }}
-                    />
-                  )}
-
-                  <input
-                    className="input"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={price}
-                    onChange={(e) =>
-                      setPrice(
-                        e.target.value === "" ? "" : Number(e.target.value) || 0
-                      )
-                    }
-                    placeholder="Price in €"
-                    style={{ maxWidth: 200 }}
-                  />
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleCreateOrUpdateListing}
-                    >
-                      {editingId ? "Save changes" : "Publish listing"}
-                    </button>
-                    {editingId && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={resetForm}
-                      >
-                        Cancel edit
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* PREVIEW + IMAGES */}
-                <div className="stack-8">
-                  <div className="kicker">Preview</div>
-                  <div className="card card-hover">
-                    <div
-                      style={{
-                        height: 140,
-                        backgroundImage: `url(${
-                          imagePreviews[0] ??
-                          (editingId
-                            ? myListings.find((l) => l.id === editingId)?.imageUrl ??
-                              "/donut3.png"
-                            : "/donut3.png")
-                        })`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        borderTopLeftRadius: 16,
-                        borderTopRightRadius: 16,
-                      }}
-                    />
-                    <div style={{ padding: 12 }} className="stack-6">
-                      <div
-                        style={{
-                          fontWeight: 900,
-                          fontSize: 14,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {title || "Listing title"}
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: 13,
-                        }}
-                      >
-                        <span>
-                          {price === "" ? "0.00 €" : `${price.toFixed(2)} €`}
-                        </span>
-                        <span>You</span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#d1d5db",
-                          maxHeight: 60,
-                          overflow: "hidden",
-                        }}
-                      >
-                        {description || "Short description of your listing."}
-                      </div>
-                      {listingType === "item" && (
-                        <div
-                          style={{
-                            marginTop: 4,
-                            fontSize: 11,
-                            color: "#9ca3af",
-                          }}
-                        >
-                          Quantity: {quantity}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="stack-4">
-                    <label className="p" style={{ fontSize: 13 }}>
-                      Screenshots {editingId ? "(optional when editing)" : "(required)"}
-                    </label>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImagesChange}
-                    />
-                    {imagePreviews.length > 0 && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 8,
-                          marginTop: 8,
-                        }}
-                      >
-                        {imagePreviews.map((src, idx) => (
-                          <img
-                            key={idx}
-                            src={src}
-                            alt={`preview-${idx}`}
-                            style={{
-                              width: 72,
-                              height: 72,
-                              objectFit: "cover",
-                              borderRadius: 6,
-                              border: "1px solid rgba(255,255,255,0.1)",
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* LISTINGS LIST */}
-          <div className="surface glass" style={{ padding: 12 }}>
-            <div className="stack-6">
-              <div className="kicker">
-                {tab === "sales" ? "My listings" : "Listings from other players"}
-              </div>
-              {listToShow.length === 0 ? (
-                <div className="p" style={{ fontSize: 13, color: "#9ca3af" }}>
-                  {tab === "sales"
-                    ? "You have not created any listing yet."
-                    : "No listings available to buy yet."}
-                </div>
-              ) : (
-                <div className="grid-cards">
-                  {listToShow.map((l) => (
-                    <div key={l.id} className="card card-hover">
-                      <div
-                        style={{
-                          height: 140,
-                          backgroundImage: `url(${l.imageUrl})`,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          borderTopLeftRadius: 16,
-                          borderTopRightRadius: 16,
-                        }}
-                      />
-                      <div style={{ padding: 12 }} className="stack-6">
-                        <div
-                          style={{
-                            fontWeight: 900,
-                            fontSize: 14,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {l.title}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            fontSize: 13,
-                          }}
-                        >
-                          <span>{l.priceLabel}</span>
-                          <span>{l.sellerName}</span>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            fontSize: 11,
-                            color: "#9ca3af",
-                          }}
-                        >
-                          <span>{l.trustPercent}% trust</span>
-                          <span>• {l.reviewCount} reviews</span>
-                        </div>
-                        {l.type === "item" && l.quantity && (
-                          <div
-                            style={{
-                              marginTop: 4,
-                              fontSize: 11,
-                              color: "#9ca3af",
-                            }}
-                          >
-                            Quantity: {l.quantity}
-                          </div>
-                        )}
-
-                        {tab === "sales" && (
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "flex-end",
-                              marginTop: 6,
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              style={{ fontSize: 12, paddingInline: 10 }}
-                              onClick={() => handleEditClick(l)}
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
+// GET /api/listings
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = url.searchParams.get("q") || "";
@@ -8,16 +11,102 @@ export async function GET(req: Request) {
   const escrow = url.searchParams.get("escrow") !== "0";
 
   const where: any = { active: true };
-  if (q) where.OR = [{ title: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }];
+  if (q) {
+    where.OR = [
+      { title: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } },
+    ];
+  }
   if (cat) where.category = { slug: cat };
   if (escrow) where.escrowOnly = true;
 
-  const listings = await db.listing.findMany({
+  const listings = await prisma.listing.findMany({
     where,
     take: 60,
     orderBy: { createdAt: "desc" },
-    include: { category: true, seller: { include: { sellerProfile: true } } }
+    include: {
+      category: true,
+      seller: { include: { sellerProfile: true } },
+      images: true,
+    },
   });
 
   return NextResponse.json({ listings });
+}
+
+// POST /api/listings
+export async function POST(req: Request) {
+  try {
+    // 1) Récupérer la session (user connecté)
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user || !(session.user as any).id) {
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const sellerId = (session.user as any).id as string;
+
+    // 2) Lire le body envoyé par le client
+    const body = await req.json();
+
+    const {
+      title,
+      description,
+      whatYouGet,
+      priceCents,
+      stock,
+      deliveryType,
+      imageUrl,
+    } = body;
+
+    // 3) Vérifier les champs obligatoires
+    if (!title || !description || !priceCents || !deliveryType) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // 4) Récupérer une category existante (par défaut)
+    const category = await prisma.category.findFirst();
+    if (!category) {
+      return NextResponse.json(
+        { error: "No category in DB" },
+        { status: 400 }
+      );
+    }
+
+    // 5) Créer l'annonce liée au user connecté
+    const listing = await prisma.listing.create({
+      data: {
+        sellerId, // <= ici : le compte connecté
+        categoryId: category.id,
+        title,
+        description,
+        whatYouGet,
+        priceCents,
+        stock: stock ?? 1,
+        deliveryType,
+        // currency et escrowOnly ont des valeurs par défaut dans Prisma
+        images: imageUrl
+          ? {
+              create: [{ url: imageUrl }],
+            }
+          : undefined,
+      },
+      include: {
+        category: true,
+        seller: { include: { sellerProfile: true } },
+        images: true,
+      },
+    });
+
+    return NextResponse.json({ listing }, { status: 201 });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
 }
