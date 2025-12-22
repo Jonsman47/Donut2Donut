@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 /* ============================================================
    Donut2Donut — 2025 Global Styles (Bright Glass / Blue)
    Images supported:
@@ -9,6 +10,7 @@
    - /donut2.png (crystal glow)
    - /donut3.png (hero/backdrop)
    ============================================================ */
+
 
 /* -----------------------------
    0) Design Tokens
@@ -62,6 +64,7 @@
   --max: 1220px;
 }
 
+
 /* -----------------------------
    1) Base Reset
    ----------------------------- */
@@ -94,6 +97,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   }
 }
 
+
 /* -----------------------------
    2) Scrollbar
    ----------------------------- */
@@ -101,6 +105,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 *::-webkit-scrollbar-track { background: rgba(255,255,255,0.07); border-radius: 999px; }
 *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); border-radius: 999px; }
 *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.30); }
+
 
 /* -----------------------------
    3) App Shell Layers
@@ -142,6 +147,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   filter: drop-shadow(0 0 90px rgba(42,123,255,0.30));
   transform: rotate(8deg);
 }
+
 
 /* -----------------------------
    4) Layout Utilities
@@ -193,6 +199,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   box-shadow: 0 20px 70px rgba(0,0,0,0.32);
 }
 
+
 /* -----------------------------
    5) Typography
    ----------------------------- */
@@ -227,8 +234,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: rgba(255,255,255,0.82);
 }
 
+
 /* -----------------------------
-   6) Surfaces (THIS is what fixes “gray”)
+   6) Surfaces
    ----------------------------- */
 .surface {
   background: linear-gradient(
@@ -279,6 +287,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   opacity: 0.88;
 }
 
+
 /* -----------------------------
    7) Buttons
    ----------------------------- */
@@ -319,6 +328,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn-wide { width: 100%; }
 .btn-icon { width: 44px; padding: 0; border-radius: var(--r14); }
 
+
 /* -----------------------------
    8) Inputs
    ----------------------------- */
@@ -352,6 +362,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding-right: 34px;
 }
 
+
 /* -----------------------------
    9) Badges
    ----------------------------- */
@@ -369,6 +380,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .badge-blue { color: var(--b1); }
 .badge-good { color: rgba(34,197,94,0.98); }
+
 
 /* -----------------------------
    10) Cards
@@ -404,12 +416,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .card-hover:hover .card-img img { transform: scale(1.05); }
 
+
 /* -----------------------------
-   11) Hero (FIXED: overlays no longer block clicks)
+   11) Hero
    ----------------------------- */
 .hero { position: relative; overflow: hidden; border-radius: var(--r30); }
 
-/* IMPORTANT: pointer-events none + z-index so clicks go to content */
 .hero::before {
   content: "";
   position: absolute;
@@ -424,7 +436,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   z-index: 0;
 }
 
-/* LESS DARK FOG (important) */
 .hero::after {
   content: "";
   position: absolute;
@@ -462,6 +473,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   z-index: 2;
 }
 
+
 /* -----------------------------
    12) Misc
    ----------------------------- */
@@ -495,9 +507,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .ring-glow { box-shadow: var(--shGlow); }
 }
 
+
 /* -----------------------------
-   13) Listing pages: force readable blocks
-   (Only works if you wrap listing page with <div className="listing-page">)
+   13) Listing pages
    ----------------------------- */
 .listing-page section,
 .listing-page .block,
@@ -505,4 +517,59 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.12));
   border: 1px solid rgba(255,255,255,0.26);
   border-radius: var(--r24);
+}
+
+
+/* -----------------------------
+   14) Fix select visibility (glass + transparent)
+   ----------------------------- */
+select.input {
+  color: var(--txt0);
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.26);
+}
+
+select.input option {
+  color: #e5e7eb;
+  background-color: #020617;
+}
+
+
+/* 15) Dropdown de recherche pour items */
+.dropdown-panel {
+  position: absolute;
+  z-index: 20;
+  top: 48px;                 /* juste sous un input de 44px */
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+
+  border-radius: var(--r14);
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.22),
+    rgba(255,255,255,0.10)
+  );
+  border: 1px solid rgba(255,255,255,0.26);
+  box-shadow: var(--shSoft);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.dropdown-item {
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  color: var(--txt1);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.dropdown-item:hover {
+  background: rgba(255,255,255,0.14);
+  color: var(--txt0);
 }

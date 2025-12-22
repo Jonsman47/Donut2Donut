@@ -8,6 +8,9 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { data: session, status } = useSession();
 
+  // TODO: replace with real balance from DB or API
+  const balance = 0;
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     onScroll();
@@ -120,10 +123,37 @@ export default function Navbar() {
             gap: 10,
           }}
         >
-          {/* Bouton qui change selon la session */}
+          {/* Sold: only when authenticated, just left of Logout */}
+          {status === "authenticated" && (
+            <div
+              className="surface glass"
+              style={{
+                padding: "4px 10px",
+                borderRadius: 999,
+                textAlign: "right",
+                fontSize: 13,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.08,
+                  color: "#9ca3af",
+                }}
+              >
+                Sold
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>
+                {balance.toFixed(2)} €
+              </div>
+            </div>
+          )}
+
+          {/* Boutons qui changent selon la session */}
           {status === "loading" && (
             <button className="btn btn-ghost" style={{ height: 32 }} disabled>
-              Chargement...
+              Loading...
             </button>
           )}
 
