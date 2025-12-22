@@ -31,7 +31,37 @@ export async function GET(req: Request) {
     },
   });
 
-  return NextResponse.json({ listings });
+  const sellerIds = Array.from(new Set(listings.map((listing) => listing.sellerId)));
+  const reviewStats = sellerIds.length
+    ? await prisma.review.groupBy({
+        by: ["toId"],
+        where: { toId: { in: sellerIds } },
+        _avg: { rating: true },
+        _count: { rating: true },
+      })
+    : [];
+
+  const reviewBySeller = new Map(
+    reviewStats.map((stat) => [
+      stat.toId,
+      {
+        avg: stat._avg.rating ?? 0,
+        count: stat._count.rating,
+      },
+    ])
+  );
+
+  const payload = listings.map((listing) => {
+    const review = reviewBySeller.get(listing.sellerId);
+    const trustPercent = review ? Math.round((review.avg / 5) * 100) : 0;
+    return {
+      ...listing,
+      trustPercent,
+      reviewCount: review?.count ?? 0,
+    };
+  });
+
+  return NextResponse.json({ listings: payload });
 }
 
 // POST /api/listings

@@ -12,7 +12,7 @@ export default function Footer() {
           <Link className="nav-link" href="/market">
             Market
           </Link>
-          <Link className="nav-link" href="/orders">
+          <Link className="nav-link" href="/market/orders">
             Orders
           </Link>
           <Link className="nav-link" href="/rules">

@@ -8,6 +8,7 @@ export type Listing = {
   id: string;
   title: string;
   imageUrl: string;
+  imageUrls?: string[];
   priceLabel: string;
 
   sellerId: string;        // <= ajouté
@@ -101,18 +102,37 @@ export async function getListings(): Promise<Listing[]> {
     orderBy: { createdAt: "desc" },
   }); // [web:631]
 
+  const sellerIds = Array.from(new Set(listings.map((l) => l.sellerId)));
+  const reviewStats = sellerIds.length
+    ? await prisma.review.groupBy({
+        by: ["toId"],
+        where: { toId: { in: sellerIds } },
+        _avg: { rating: true },
+        _count: { rating: true },
+      })
+    : [];
+  const reviewBySeller = new Map(
+    reviewStats.map((stat) => [
+      stat.toId,
+      { avg: stat._avg.rating ?? 0, count: stat._count.rating },
+    ])
+  );
+
   return listings.map((l) => ({
     id: l.id,
     title: l.title,
     imageUrl: l.images[0]?.url ?? getDonutImage(1),
+    imageUrls: l.images.map((img) => img.url),
     priceLabel: `${l.priceCents / 100} €`,
 
     sellerId: l.sellerId,
     sellerName: l.seller.username,
     sellerVerified: !!l.seller.sellerProfile,
 
-    trustPercent: 90,
-    reviewCount: 0,
+    trustPercent: Math.round(
+      ((reviewBySeller.get(l.sellerId)?.avg ?? 0) / 5) * 100
+    ),
+    reviewCount: reviewBySeller.get(l.sellerId)?.count ?? 0,
     delivery:
       l.deliveryType === "INGAME_TRADE"
         ? "In-game trade"
@@ -141,18 +161,25 @@ export async function getListingById(id: string): Promise<Listing | null> {
 
   if (!l) return null;
 
+  const review = await prisma.review.aggregate({
+    where: { toId: l.sellerId },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+
   return {
     id: l.id,
     title: l.title,
     imageUrl: l.images[0]?.url ?? getDonutImage(1),
+    imageUrls: l.images.map((img) => img.url),
     priceLabel: `${l.priceCents / 100} €`,
 
     sellerId: l.sellerId,
     sellerName: l.seller.username,
     sellerVerified: !!l.seller.sellerProfile,
 
-    trustPercent: 90,
-    reviewCount: 0,
+    trustPercent: Math.round(((review._avg.rating ?? 0) / 5) * 100),
+    reviewCount: review._count.rating,
     delivery:
       l.deliveryType === "INGAME_TRADE"
         ? "In-game trade"

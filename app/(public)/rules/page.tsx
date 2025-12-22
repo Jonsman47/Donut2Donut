@@ -117,7 +117,7 @@ export default function RulesPage() {
             <Link className="btn btn-primary" href="/seller/new">
               Make a listing
             </Link>
-            <Link className="btn btn-ghost" href="/orders">
+            <Link className="btn btn-ghost" href="/market/orders">
               Track orders
             </Link>
           </div>
