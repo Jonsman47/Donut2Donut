@@ -22,6 +22,7 @@ type Listing = {
   sellerId: string;
   delivery: string;
   escrowOn: boolean;
+  createdAt?: string;
 };
 
 function parsePrice(label: string) {
@@ -37,6 +38,9 @@ export default function MarketPage() {
 
   const [tab, setTab] = useState<"sales" | "buys">("sales");
   const [query, setQuery] = useState("");
+  const [filterType, setFilterType] = useState<"all" | ListingType>("all");
+  const [escrowFilter, setEscrowFilter] = useState<"all" | "on" | "off">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "price-asc" | "price-desc" | "trust">("newest");
 
   const [listingType, setListingType] = useState<ListingType>("item");
   const [title, setTitle] = useState("");
@@ -66,8 +70,8 @@ export default function MarketPage() {
           description: l.description,
           priceLabel: (l.priceCents / 100).toFixed(2) + " €",
           sellerName: l.seller?.username ?? "Unknown",
-          trustPercent: l.seller?.sellerProfile?.trustScore ?? 0,
-          reviewCount: 0,
+          trustPercent: l.trustPercent ?? 0,
+          reviewCount: l.reviewCount ?? 0,
           imageUrl: l.images?.[0]?.url ?? getDonutImage(index),
           type: l.deliveryType === "SERVICE" ? "service" : "item",
           quantity: l.stock ?? undefined,
@@ -75,6 +79,7 @@ export default function MarketPage() {
           sellerId: l.seller?.id ?? "",
           delivery: l.deliveryType === "SERVICE" ? "Service" : "In-game trade",
           escrowOn: l.escrowOnly ?? true,
+          createdAt: l.createdAt,
         }));
 
         setAllListings(mapped);
@@ -140,25 +145,53 @@ export default function MarketPage() {
 
     const priceLabel = `${Number(price).toFixed(2)} €`;
 
-    // Local edit (UI-only)
     if (editingId) {
-      setAllListings((prev) =>
-        prev.map((l) =>
-          l.id === editingId
-            ? {
-                ...l,
-                title: listingType === "item" ? `${quantity}x ${title.trim()}` : title.trim(),
-                description: description.trim(),
-                priceLabel,
-                imageUrl: coverUrl,
-                type: listingType,
-                quantity: listingType === "item" ? quantity : undefined,
-              }
-            : l
-        )
-      );
-      resetForm();
-      return;
+      try {
+        const res = await fetch(`/api/listings/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: listingType === "item" ? `${quantity}x ${title.trim()}` : title.trim(),
+            description: description.trim(),
+            whatYouGet: description.trim(),
+            priceCents: Math.round(Number(price) * 100),
+            stock: listingType === "item" ? quantity : null,
+            deliveryType: listingType === "item" ? "INGAME_TRADE" : "SERVICE",
+            imageUrl: coverUrl,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError((data as any).error || "Failed to update listing.");
+          return;
+        }
+
+        const data = await res.json();
+        setAllListings((prev) =>
+          prev.map((l) =>
+            l.id === editingId
+              ? {
+                  ...l,
+                  title: data.listing.title,
+                  description: data.listing.description,
+                  priceLabel: (data.listing.priceCents / 100).toFixed(2) + " €",
+                  imageUrl: data.listing.images?.[0]?.url ?? coverUrl,
+                  type: data.listing.deliveryType === "SERVICE" ? "service" : "item",
+                  quantity: data.listing.stock ?? undefined,
+                  delivery: data.listing.deliveryType === "SERVICE" ? "Service" : "In-game trade",
+                  escrowOn: data.listing.escrowOnly ?? true,
+                }
+              : l
+          )
+        );
+        resetForm();
+        return;
+      } catch (e) {
+        console.error(e);
+        setError("Server error while updating listing.");
+        return;
+      }
     }
 
     // Create via API
@@ -201,6 +234,7 @@ export default function MarketPage() {
           sellerId: userId ?? "",
           delivery: listingType === "service" ? "Service" : "In-game trade",
           escrowOn: true,
+          createdAt: data.listing.createdAt ?? new Date().toISOString(),
         },
         ...prev,
       ]);
@@ -264,12 +298,25 @@ export default function MarketPage() {
 
   const filteredListings = (tab === "sales" ? myListings : otherListings)
     .slice()
-    .sort((a, b) => parsePrice(a.priceLabel) - parsePrice(b.priceLabel))
     .filter((l) => {
       const q = query.trim().toLowerCase();
       if (!q) return true;
       const haystack = `${l.title} ${l.description} ${l.priceLabel}`.toLowerCase();
       return haystack.includes(q);
+    })
+    .filter((l) => (filterType === "all" ? true : l.type === filterType))
+    .filter((l) => {
+      if (escrowFilter === "all") return true;
+      return escrowFilter === "on" ? l.escrowOn : !l.escrowOn;
+    })
+    .sort((a, b) => {
+      if (sortBy === "newest") {
+        return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+      }
+      if (sortBy === "price-asc") return parsePrice(a.priceLabel) - parsePrice(b.priceLabel);
+      if (sortBy === "price-desc") return parsePrice(b.priceLabel) - parsePrice(a.priceLabel);
+      if (sortBy === "trust") return b.trustPercent - a.trustPercent;
+      return 0;
     });
 
   return (
@@ -293,6 +340,36 @@ export default function MarketPage() {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={tab === "sales" ? "Search in your listings…" : "Search in available listings…"}
                 />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <select
+                    className="input"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value as typeof filterType)}
+                  >
+                    <option value="all">All types</option>
+                    <option value="item">Item</option>
+                    <option value="service">Service</option>
+                  </select>
+                  <select
+                    className="input"
+                    value={escrowFilter}
+                    onChange={(e) => setEscrowFilter(e.target.value as typeof escrowFilter)}
+                  >
+                    <option value="all">Escrow: all</option>
+                    <option value="on">Escrow on</option>
+                    <option value="off">Escrow off</option>
+                  </select>
+                  <select
+                    className="input"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  >
+                    <option value="newest">Sort: newest</option>
+                    <option value="price-asc">Price: low to high</option>
+                    <option value="price-desc">Price: high to low</option>
+                    <option value="trust">Trust</option>
+                  </select>
+                </div>
                 <div className="muted" style={{ fontSize: "0.85rem" }}>
                   Escrow • Proofs • 48h disputes
                 </div>
@@ -541,6 +618,9 @@ export default function MarketPage() {
                     reviewCount={listing.reviewCount}
                     delivery={listing.delivery}
                     escrowOn={listing.escrowOn}
+                    messageHref={`/market/messages?listingId=${listing.id}&prefill=${encodeURIComponent(
+                      `Hi, I’m interested in ${listing.title}. Is it still available?`
+                    )}`}
                   />
 
                   {tab === "sales" && listing.sellerId === userId && (

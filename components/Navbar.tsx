@@ -2,18 +2,45 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/market", label: "Market" },
-  { href: "/orders", label: "Orders" },
+  { href: "/market/orders", label: "Orders" },
+  { href: "/market/sales", label: "Sales" },
+  { href: "/market/messages", label: "Messages" },
   { href: "/rules", label: "Rules" },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
+  const [counts, setCounts] = useState<{
+    unreadMessages: number;
+    pendingSales: number;
+    activeOrders: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let active = true;
+    async function loadCounts() {
+      try {
+        const res = await fetch("/api/unread-counts");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) setCounts(data);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadCounts();
+    return () => {
+      active = false;
+    };
+  }, [status]);
 
   return (
     <header className="site-header">
@@ -30,13 +57,26 @@ export default function Navbar() {
         <nav className="nav-links">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
+            const badge =
+              link.href === "/market/messages"
+                ? counts?.unreadMessages
+                : link.href === "/market/sales"
+                ? counts?.pendingSales
+                : link.href === "/market/orders"
+                ? counts?.activeOrders
+                : 0;
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 className={`nav-link${isActive ? " active" : ""}`}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {!!badge && badge > 0 && (
+                  <span className="badge badge-warn" style={{ marginLeft: 6 }}>
+                    {badge}
+                  </span>
+                )}
               </Link>
             );
           })}
