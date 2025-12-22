@@ -213,7 +213,7 @@ model Notification {
   user   User @relation(fields: [userId], references: [id])
 
   type   String
-  data   Json
+  data   String
   readAt DateTime?
 
   createdAt DateTime @default(now())

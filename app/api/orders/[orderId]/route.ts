@@ -164,10 +164,10 @@ export async function PATCH(
     data: {
       userId: recipientId,
       type: "ORDER_STATUS",
-      data: {
+      data: JSON.stringify({
         orderId: order.id,
         status: nextStatus,
-      },
+      }),
     },
   });
 

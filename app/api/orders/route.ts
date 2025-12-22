@@ -70,10 +70,10 @@ export async function POST(req: NextRequest) {
     data: {
       userId: listing.sellerId,
       type: "ORDER_STATUS",
-      data: {
+      data: JSON.stringify({
         orderId: order.id,
         status: order.status,
-      },
+      }),
     },
   });
 

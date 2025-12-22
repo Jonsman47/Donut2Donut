@@ -108,11 +108,11 @@ export async function POST(
     data: {
       userId: recipientId,
       type: "MESSAGE",
-      data: {
+      data: JSON.stringify({
         conversationId: conversation.id,
         listingId: conversation.listingId,
         messageId: message.id,
-      },
+      }),
     },
   });
 
