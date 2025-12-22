@@ -35,6 +35,7 @@
 
   --max: 1160px;
   --hero-bg: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+  --header-bg: rgba(247, 249, 252, 0.9);
 }
 
 [data-theme="dark"] {
@@ -60,6 +61,7 @@
   --focus: 0 0 0 3px rgba(96, 165, 250, 0.35);
 
   --hero-bg: linear-gradient(180deg, #0f172a 0%, #101b2e 100%);
+  --header-bg: rgba(11, 15, 26, 0.9);
 }
 
 * {
@@ -440,7 +442,7 @@ textarea::placeholder {
   top: 0;
   z-index: 50;
   backdrop-filter: blur(16px);
-  background: rgba(247, 249, 252, 0.9);
+  background: var(--header-bg);
   border-bottom: 1px solid var(--border);
 }
 
