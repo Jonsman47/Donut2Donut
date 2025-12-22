@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
+import ThemeToggle from "./ThemeToggle";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -86,6 +87,8 @@ export default function Navbar() {
           <span className="badge badge-blue" style={{ display: "none" }}>
             Escrow on
           </span>
+
+          <ThemeToggle />
 
           {status === "loading" && (
             <button className="btn btn-ghost" type="button" disabled>
