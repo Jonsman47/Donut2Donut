@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession, signIn, signOut } from "next-auth/react";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -118,13 +120,32 @@ export default function Navbar() {
             gap: 10,
           }}
         >
-          <a
-          href="/login"
-          className="btn btn-ghost"
-          style={{ height: 32 }}
-        >
-          Login
-        </a>
+          {/* Bouton qui change selon la session */}
+          {status === "loading" && (
+            <button className="btn btn-ghost" style={{ height: 32 }} disabled>
+              Chargement...
+            </button>
+          )}
+
+          {status === "unauthenticated" && (
+            <button
+              className="btn btn-ghost"
+              style={{ height: 32 }}
+              onClick={() => signIn(undefined, { callbackUrl: "/" })}
+            >
+              Login
+            </button>
+          )}
+
+          {status === "authenticated" && (
+            <button
+              className="btn btn-ghost"
+              style={{ height: 32 }}
+              onClick={() => signOut({ callbackUrl: "/" })}
+            >
+              Logout ({session?.user?.name ?? session?.user?.email})
+            </button>
+          )}
 
           <span
             className="badge badge-good ring-glow"

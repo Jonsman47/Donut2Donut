@@ -28,6 +28,7 @@ model User {
   reportsAgainst Report[]       @relation("ReportsAgainst")
   disputesOpened Dispute[]      @relation("DisputesOpened")
   trustEvents    TrustEvent[]
+
 }
 
 model SellerProfile {
@@ -251,18 +252,3 @@ model TrustEvent {
   meta      String? // JSON text
   createdAt DateTime @default(now())
 }
-
-
-model DiscordVerifyCode {
-  code      String   @id
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([expiresAt])
-}
-
