@@ -15,7 +15,7 @@ const navLinks = [
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const pathname = usePathname();
 
   useEffect(() => {

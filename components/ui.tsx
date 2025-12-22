@@ -10,7 +10,9 @@ export function Card({ children, className }: { children: React.ReactNode; class
 }
 
 export function Button(
-  props: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" }
+  props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: "primary" | "secondary" | "ghost" | "soft";
+  }
 ) {
   const { className, variant = "primary", ...rest } = props;
   const variantClass =
@@ -18,7 +20,9 @@ export function Button(
       ? "btn btn-primary"
       : variant === "secondary"
         ? "btn btn-secondary"
-        : "btn btn-ghost";
+        : variant === "soft"
+          ? "btn btn-soft"
+          : "btn btn-ghost";
 
   return <button {...rest} className={clsx(variantClass, className)} />;
 }
@@ -31,9 +35,19 @@ export function A({ href, children }: { href: string; children: React.ReactNode 
   );
 }
 
-export function Badge({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "primary" | "accent" }) {
+export function Badge({
+  children,
+  variant = "default",
+}: {
+  children: React.ReactNode;
+  variant?: "default" | "primary" | "accent";
+}) {
   const variantClass =
-    variant === "primary" ? "badge badge-primary" : variant === "accent" ? "badge badge-accent" : "badge";
+    variant === "primary"
+      ? "badge badge-primary"
+      : variant === "accent"
+        ? "badge badge-accent"
+        : "badge";
 
   return <span className={variantClass}>{children}</span>;
 }

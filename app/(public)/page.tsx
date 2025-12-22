@@ -10,15 +10,15 @@ export default function Home() {
     <div>
       <section className="section">
         <div className="container">
-          <div className="hero">
-            <div className="hero-grid" style={{ padding: "36px" }}>
-              <div className="stack-20">
+          <div className="hero fade-up">
+            <div className="hero-grid" style={{ padding: "40px" }}>
+              <div className="stack-20" style={{ textAlign: "center" }}>
                 <span className="kicker">Donut2Donut</span>
-                <h1 className="h1">Trust-first trading for DonutSMP.</h1>
+                <h1 className="h1">The trusted DonutSMP marketplace.</h1>
                 <p className="p">
-                  Escrow-backed listings with clear proof and fast resolution.
+                  Escrow-first trades with clear proof and fast resolution.
                 </p>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
                   <Link className="btn btn-primary" href="/market">
                     Get started
                   </Link>
@@ -26,14 +26,14 @@ export default function Home() {
                     Learn more
                   </Link>
                 </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
                   <span className="badge badge-primary">Escrow default</span>
-                  <span className="badge">Verified sellers</span>
+                  <span className="badge">Verified profiles</span>
                   <span className="badge badge-accent">Dispute support</span>
                 </div>
               </div>
 
-              <div className="hero-visual">
+              <div className="hero-visual" style={{ maxWidth: 460, margin: "0 auto" }}>
                 <Image
                   src={heroImage}
                   alt="Donut marketplace"
@@ -61,11 +61,11 @@ export default function Home() {
               },
               {
                 title: "Transparent trust",
-                text: "Verified profiles and visible reputation signals.",
+                text: "Verified sellers and visible reputation signals.",
               },
             ].map((card) => (
               <div key={card.title} className="card card-hover" style={{ padding: "24px" }}>
-                <div className="stack-12">
+                <div className="stack-12" style={{ textAlign: "center" }}>
                   <div className="h3">{card.title}</div>
                   <p className="p">{card.text}</p>
                 </div>
@@ -78,17 +78,17 @@ export default function Home() {
       <section className="section">
         <div className="container">
           <div className="social-strip">
-            <div className="stack-6">
+            <div className="stack-6" style={{ textAlign: "center" }}>
               <span className="kicker">Security</span>
               <div className="h3">Escrow coverage</div>
               <span className="p">100% protected funds</span>
             </div>
-            <div className="stack-6">
+            <div className="stack-6" style={{ textAlign: "center" }}>
               <span className="kicker">Speed</span>
               <div className="h3">Fast resolution</div>
               <span className="p">Clear dispute steps</span>
             </div>
-            <div className="stack-6">
+            <div className="stack-6" style={{ textAlign: "center" }}>
               <span className="kicker">Trust</span>
               <div className="h3">Verified sellers</div>
               <span className="p">Transparent profiles</span>
@@ -103,7 +103,7 @@ export default function Home() {
             <div className="grid-2" style={{ alignItems: "center" }}>
               <div className="stack-16">
                 <span className="kicker">Get started</span>
-                <div className="h2">Start trading with confidence.</div>
+                <div className="h2">Trade with confidence.</div>
                 <p className="p">
                   Post listings or browse the market with escrow protection.
                 </p>

@@ -67,9 +67,9 @@ export default function ListingCard({
         </div>
       </div>
 
-      <div style={{ padding: 16 }} className="stack-12">
+      <div className="card-body stack-12">
         <div className="stack-8">
-          <div className="h3" style={{ fontWeight: 700 }}>
+          <div className="h3" style={{ fontWeight: 600 }}>
             {title}
           </div>
 
@@ -93,7 +93,7 @@ export default function ListingCard({
           }}
         >
           <span className="badge">{delivery}</span>
-          <span style={{ fontWeight: 700 }}>{priceLabel}</span>
+          <span style={{ fontWeight: 600 }}>{priceLabel}</span>
         </div>
       </div>
     </Link>
