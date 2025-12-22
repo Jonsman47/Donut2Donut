@@ -44,6 +44,10 @@ export default function MarketPage() {
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState<number | "">("");
   const [coverUrl, setCoverUrl] = useState(gallery[0] ?? getDonutImage(0));
+
+  // Optional custom cover (URL or uploaded file as base64)
+  const [customImageUrl, setCustomImageUrl] = useState("");
+
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -92,7 +96,26 @@ export default function MarketPage() {
     setPrice("");
     setListingType("item");
     setCoverUrl(gallery[0] ?? getDonutImage(0));
+    setCustomImageUrl("");
     setError(null);
+  }
+
+  function handleCustomImageUrl(value: string) {
+    setCustomImageUrl(value);
+    if (value.trim()) setCoverUrl(value.trim());
+  }
+
+  function handleImageFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (result) {
+        setCustomImageUrl("");
+        setCoverUrl(result);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   async function handleCreateOrUpdateListing() {
@@ -115,18 +138,16 @@ export default function MarketPage() {
       return;
     }
 
-    const priceLabel = `${price.toFixed(2)} €`;
+    const priceLabel = `${Number(price).toFixed(2)} €`;
 
+    // Local edit (UI-only)
     if (editingId) {
       setAllListings((prev) =>
         prev.map((l) =>
           l.id === editingId
             ? {
                 ...l,
-                title:
-                  listingType === "item"
-                    ? `${quantity}x ${title.trim()}`
-                    : title.trim(),
+                title: listingType === "item" ? `${quantity}x ${title.trim()}` : title.trim(),
                 description: description.trim(),
                 priceLabel,
                 imageUrl: coverUrl,
@@ -140,18 +161,16 @@ export default function MarketPage() {
       return;
     }
 
+    // Create via API
     try {
       const res = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title:
-            listingType === "item"
-              ? `${quantity}x ${title.trim()}`
-              : title.trim(),
+          title: listingType === "item" ? `${quantity}x ${title.trim()}` : title.trim(),
           description: description.trim(),
           whatYouGet: description.trim(),
-          priceCents: Math.round((price as number) * 100),
+          priceCents: Math.round(Number(price) * 100),
           stock: listingType === "item" ? quantity : null,
           deliveryType: listingType === "item" ? "INGAME_TRADE" : "SERVICE",
           imageUrl: coverUrl,
@@ -159,8 +178,8 @@ export default function MarketPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Failed to create listing.");
+        const data = await res.json().catch(() => ({}));
+        setError((data as any).error || "Failed to create listing.");
         return;
       }
 
@@ -185,6 +204,7 @@ export default function MarketPage() {
         },
         ...prev,
       ]);
+
       resetForm();
     } catch (e) {
       console.error(e);
@@ -197,6 +217,7 @@ export default function MarketPage() {
 
     let baseTitle = listing.title;
     let qty = 1;
+
     if (listing.type === "item") {
       const match = listing.title.match(/^(\d+)x\s+(.*)$/);
       if (match) {
@@ -209,9 +230,12 @@ export default function MarketPage() {
     setTitle(baseTitle);
     setDescription(listing.description);
     setQuantity(listing.quantity ?? qty);
+
     const numericPrice = parsePrice(listing.priceLabel);
     setPrice(Number.isFinite(numericPrice) ? numericPrice : "");
+
     setCoverUrl(listing.imageUrl || getDonutImage(0));
+    setCustomImageUrl("");
     setError(null);
   }
 
@@ -220,9 +244,7 @@ export default function MarketPage() {
     if (!ok) return;
 
     try {
-      const res = await fetch(`/api/listings/${listingId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/listings/${listingId}`, { method: "DELETE" });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -260,8 +282,8 @@ export default function MarketPage() {
                 <span className="kicker">Marketplace</span>
                 <h1 className="h2">DonutSMP trading hub</h1>
                 <p className="p">
-                  Browse verified listings or create your own. Escrow and proofs are
-                  always on by default.
+                  Browse verified listings or create your own. Escrow and proofs are always on by
+                  default.
                 </p>
               </div>
               <div className="stack-6">
@@ -269,11 +291,7 @@ export default function MarketPage() {
                   className="input"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={
-                    tab === "sales"
-                      ? "Search in your listings…"
-                      : "Search in available listings…"
-                  }
+                  placeholder={tab === "sales" ? "Search in your listings…" : "Search in available listings…"}
                 />
                 <div className="muted" style={{ fontSize: "0.85rem" }}>
                   Escrow • Proofs • 48h disputes
@@ -305,12 +323,8 @@ export default function MarketPage() {
                 <div className="stack-10">
                   <div className="stack-4">
                     <span className="kicker">{editingId ? "Edit" : "Create"}</span>
-                    <h2 className="h2">
-                      {editingId ? "Update listing" : "Create a listing"}
-                    </h2>
-                    <p className="p">
-                      Add a clear title, set your price, and choose a cover image.
-                    </p>
+                    <h2 className="h2">{editingId ? "Update listing" : "Create a listing"}</h2>
+                    <p className="p">Add a clear title, set your price, and choose a cover image.</p>
                   </div>
 
                   {status === "unauthenticated" && (
@@ -335,9 +349,7 @@ export default function MarketPage() {
                     </button>
                     <button
                       type="button"
-                      className={
-                        listingType === "service" ? "btn btn-soft" : "btn btn-ghost"
-                      }
+                      className={listingType === "service" ? "btn btn-soft" : "btn btn-ghost"}
                       onClick={() => setListingType("service")}
                     >
                       Service
@@ -377,19 +389,18 @@ export default function MarketPage() {
                         <label className="muted" htmlFor="quantity">
                           Quantity
                         </label>
-                      <input
-                        id="quantity"
-                        className="input"
-                        type="number"
-                        min={1}
-                        value={quantity}
-                        onChange={(e) =>
-                          setQuantity(e.target.value === "" ? 0 : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                  )}
-                  <div className="stack-6">
+                        <input
+                          id="quantity"
+                          className="input"
+                          type="number"
+                          min={1}
+                          value={quantity}
+                          onChange={(e) => setQuantity(e.target.value === "" ? 0 : Number(e.target.value))}
+                        />
+                      </div>
+                    )}
+
+                    <div className="stack-6">
                       <label className="muted" htmlFor="price">
                         Price (€)
                       </label>
@@ -400,9 +411,7 @@ export default function MarketPage() {
                         min={0}
                         step="0.01"
                         value={price}
-                        onChange={(e) =>
-                          setPrice(e.target.value === "" ? "" : Number(e.target.value))
-                        }
+                        onChange={(e) => setPrice(e.target.value === "" ? "" : Number(e.target.value))}
                       />
                     </div>
                   </div>
@@ -414,16 +423,44 @@ export default function MarketPage() {
                         <button
                           key={img}
                           type="button"
-                          onClick={() => setCoverUrl(img)}
-                          className={
-                            coverUrl === img ? "btn btn-soft" : "btn btn-ghost"
-                          }
+                          onClick={() => {
+                            setCustomImageUrl("");
+                            setCoverUrl(img);
+                          }}
+                          className={coverUrl === img ? "btn btn-soft" : "btn btn-ghost"}
                           style={{ padding: "6px 10px" }}
                         >
                           <span className="badge badge-blue">Select</span>
                           <span>{img.replace("/", "")}</span>
                         </button>
                       ))}
+                    </div>
+
+                    <div className="grid-2">
+                      <div className="stack-6">
+                        <label className="muted" htmlFor="image-url">
+                          Image URL
+                        </label>
+                        <input
+                          id="image-url"
+                          className="input"
+                          value={customImageUrl}
+                          onChange={(e) => handleCustomImageUrl(e.target.value)}
+                          placeholder="https://.../image.png"
+                        />
+                      </div>
+                      <div className="stack-6">
+                        <label className="muted" htmlFor="image-file">
+                          Upload image
+                        </label>
+                        <input
+                          id="image-file"
+                          className="input"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageFile(e.target.files?.[0] ?? null)}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -436,6 +473,7 @@ export default function MarketPage() {
                     >
                       {editingId ? "Save changes" : "Create listing"}
                     </button>
+
                     {editingId && (
                       <button className="btn btn-ghost" type="button" onClick={resetForm}>
                         Cancel
@@ -450,15 +488,9 @@ export default function MarketPage() {
                       <span className="kicker">Preview</span>
                       <ListingCard
                         href="#"
-                        title={
-                          listingType === "item"
-                            ? `${quantity}x ${title || "New listing"}`
-                            : title || "New listing"
-                        }
+                        title={listingType === "item" ? `${quantity}x ${title || "New listing"}` : title || "New listing"}
                         imageUrl={coverUrl}
-                        priceLabel={
-                          price && price !== "" ? `${Number(price).toFixed(2)} €` : "0.00 €"
-                        }
+                        priceLabel={price !== "" ? `${Number(price).toFixed(2)} €` : "0.00 €"}
                         sellerName={session?.user?.name ?? "You"}
                         sellerVerified
                         trustPercent={88}
@@ -474,9 +506,7 @@ export default function MarketPage() {
 
           <div className="stack-10">
             <div className="stack-6">
-              <h2 className="h2">
-                {tab === "sales" ? "Your listings" : "Available listings"}
-              </h2>
+              <h2 className="h2">{tab === "sales" ? "Your listings" : "Available listings"}</h2>
               <p className="p">
                 {tab === "sales"
                   ? "Manage your active listings and keep them updated."
@@ -491,9 +521,7 @@ export default function MarketPage() {
                 <div className="stack-6">
                   <span className="kicker">No listings</span>
                   <p className="p">
-                    {tab === "sales"
-                      ? "Create your first listing to get started."
-                      : "Check back soon for new listings."}
+                    {tab === "sales" ? "Create your first listing to get started." : "Check back soon for new listings."}
                   </p>
                 </div>
               </div>
@@ -514,20 +542,13 @@ export default function MarketPage() {
                     delivery={listing.delivery}
                     escrowOn={listing.escrowOn}
                   />
+
                   {tab === "sales" && listing.sellerId === userId && (
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button
-                        className="btn btn-soft"
-                        type="button"
-                        onClick={() => handleEditClick(listing)}
-                      >
+                      <button className="btn btn-soft" type="button" onClick={() => handleEditClick(listing)}>
                         Edit
                       </button>
-                      <button
-                        className="btn btn-ghost"
-                        type="button"
-                        onClick={() => handleDelete(listing.id)}
-                      >
+                      <button className="btn btn-ghost" type="button" onClick={() => handleDelete(listing.id)}>
                         Delete
                       </button>
                     </div>
