@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 type OrderStatus = "Pending" | "In Escrow" | "Delivered" | "Disputed" | "Completed";

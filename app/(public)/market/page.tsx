@@ -5,7 +5,6 @@ import ListingCard from "../../../components/ListingCard";
 import { getDemoListings } from "../../../lib/demo";
 
 type Filter = "All" | "Items" | "Currency" | "Services";
-type Sort = "Featured" | "Price: Low" | "Price: High" | "Trust: High";
 
 function parsePrice(label: string) {
   const n = Number(String(label).replace(/[^0-9.]/g, ""));
@@ -15,7 +14,7 @@ function parsePrice(label: string) {
 export default function MarketPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("All");
-  const [sort, setSort] = useState<Sort>("Featured");
+  const [sort, setSort] = useState("Featured");
   const [isLoading, setIsLoading] = useState(false);
 
   const listings = useMemo(() => getDemoListings(), []);
@@ -66,136 +65,100 @@ export default function MarketPage() {
   }
 
   return (
-    <div style={{ paddingTop: 86 }}>
-      <section className="container section-tight">
-        <div className="stack-10">
-          {/* HEADER */}
-          <div className="surface-strong glass border-grad" style={{ padding: 14 }}>
-            <div className="stack-8">
-              <div className="stack-4">
-                <div className="kicker">Donut2Donut • marketplace</div>
-
-                {/* BIG FIXED TITLE */}
-                <h1
-                  className="h1"
-                  style={{
-                    fontSize: "clamp(2.8rem, 5.2vw, 4.2rem)",
-                    lineHeight: 1.02,
-                    fontWeight: 950,
-                    letterSpacing: "-0.035em",
-                  }}
-                >
-                  A DonutSMP marketplace
-                  <br />
-                  that actually feels safe.
-                </h1>
-
-                <p className="p" style={{ maxWidth: 760 }}>
-                  Escrow by default. Proof-based delivery. Disputes with receipts.
-                  This is real-money UX — just for DonutSMP.
+    <div>
+      <section className="section-tight">
+        <div className="container stack-20">
+          <div className="card" style={{ padding: 24 }}>
+            <div className="stack-16">
+              <div className="stack-8">
+                <span className="kicker">Donut2Donut marketplace</span>
+                <h1 className="h1">Browse listings with escrow protection.</h1>
+                <p className="p" style={{ maxWidth: 720 }}>
+                  Clear proof requirements and structured disputes, built for real trades.
                 </p>
               </div>
 
-              {/* SEARCH */}
-              <div className="surface glass" style={{ padding: 10 }}>
-                <div className="stack-8">
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr auto",
-                      gap: 8,
-                    }}
-                  >
-                    <input
-                      className="input"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search items, services, sellers…"
-                    />
-                    <button
-                      className="btn btn-primary"
-                      onClick={fakeRefresh}
-                      style={{ paddingInline: 16 }}
-                    >
-                      Search
-                    </button>
+              <div className="stack-12">
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: 10,
+                  }}
+                >
+                  <input
+                    className="input"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search items, services, sellers…"
+                  />
+                  <button className="btn btn-primary" onClick={fakeRefresh}>
+                    Search
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    flexWrap: "wrap",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {(["All", "Items", "Currency", "Services"] as Filter[]).map(
+                      (f) => (
+                        <button
+                          key={f}
+                          onClick={() => {
+                            setFilter(f);
+                            fakeRefresh();
+                          }}
+                          className={f === filter ? "btn btn-soft" : "btn btn-ghost"}
+                          style={{ height: 36, paddingInline: 14, borderRadius: 999 }}
+                        >
+                          {f}
+                        </button>
+                      )
+                    )}
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      flexWrap: "wrap",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {(["All", "Items", "Currency", "Services"] as Filter[]).map(
-                        (f) => (
-                          <button
-                            key={f}
-                            onClick={() => {
-                              setFilter(f);
-                              fakeRefresh();
-                            }}
-                            className={
-                              f === filter ? "btn btn-soft" : "btn btn-ghost"
-                            }
-                            style={{
-                              height: 36,
-                              paddingInline: 12,
-                              borderRadius: 999,
-                              fontWeight: 850,
-                              boxShadow:
-                                f === filter ? "var(--shGlow)" : undefined,
-                            }}
-                          >
-                            {f}
-                          </button>
-                        )
-                      )}
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span className="badge badge-good ring-glow">
-                        Escrow ON
-                      </span>
-                      <select
-                        className="input select"
-                        value={sort}
-                        onChange={(e) => {
-                          setSort(e.target.value as Sort);
-                          fakeRefresh();
-                        }}
-                        style={{ width: 200 }}
-                      >
-                        <option>Featured</option>
-                        <option>Price: Low</option>
-                        <option>Price: High</option>
-                        <option>Trust: High</option>
-                      </select>
-                    </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className="badge badge-good">Escrow On</span>
+                    <select
+                      className="input select"
+                      value={sort}
+                      onChange={(e) => {
+                        setSort(e.target.value);
+                        fakeRefresh();
+                      }}
+                      style={{ width: 200 }}
+                    >
+                      <option>Featured</option>
+                      <option>Price: Low</option>
+                      <option>Price: High</option>
+                      <option>Trust: High</option>
+                    </select>
                   </div>
                 </div>
               </div>
 
-              {/* STATS */}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span className="badge badge-blue">{filtered.length} results</span>
+                <span className="badge badge-primary">{filtered.length} results</span>
                 <span className="badge">Proof required</span>
                 <span className="badge">Disputes</span>
-                <span className="badge badge-blue">Verified sellers</span>
+                <span className="badge badge-primary">Verified sellers</span>
               </div>
             </div>
           </div>
 
-          {/* GRID */}
           {isLoading ? (
             <div className="grid-cards">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="card">
                   <div className="skel" style={{ height: 180 }} />
-                  <div style={{ padding: 14 }} className="stack-8">
+                  <div className="card-body stack-8">
                     <div className="skel" style={{ height: 14, width: "70%" }} />
                     <div className="skel" style={{ height: 14, width: "50%" }} />
                     <div className="skel" style={{ height: 32 }} />

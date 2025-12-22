@@ -33,16 +33,22 @@ export default function VerifyPage() {
   }, [status]);
 
   if (status === "loading") {
-    return <div className="container section"><div className="p">Loading...</div></div>;
+    return (
+      <div className="container section">
+        <div className="p">Loading...</div>
+      </div>
+    );
   }
 
   if (status !== "authenticated") {
     return (
       <div className="container section">
-        <div className="surface surface-strong glass border-grad" style={{ padding: 18 }}>
-          <div className="stack-10">
+        <div className="card" style={{ padding: 24, maxWidth: 520 }}>
+          <div className="stack-12">
             <div className="h2">Login required</div>
-            <div className="p">You must log in with Discord to generate a verification code.</div>
+            <div className="p">
+              You must log in with Discord to generate a verification code.
+            </div>
             <button className="btn btn-primary" onClick={() => signIn("discord", { callbackUrl: "/verify" })}>
               Continue with Discord
             </button>
@@ -54,17 +60,19 @@ export default function VerifyPage() {
 
   return (
     <div className="container section">
-      <div className="surface surface-strong glass border-grad" style={{ padding: 18 }}>
-        <div className="stack-10">
-          <div className="h2">Discord verification</div>
-          <div className="p">
-            Copy this code and run <span className="badge">/verify CODE</span> in your Discord server.
-            Code expires fast.
+      <div className="card" style={{ padding: 24, maxWidth: 620 }}>
+        <div className="stack-16">
+          <div className="stack-8">
+            <div className="h2">Discord verification</div>
+            <div className="p">
+              Copy this code and run <span className="badge">/verify CODE</span> in your Discord server.
+              Code expires quickly.
+            </div>
           </div>
 
-          <div className="surface glass" style={{ padding: 14, borderRadius: 14 }}>
+          <div className="card" style={{ padding: 18 }}>
             <div className="kicker">One-time code</div>
-            <div style={{ fontSize: 28, fontWeight: 950, letterSpacing: 1.5 }}>
+            <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: 1.5 }}>
               {code || "..."}
             </div>
           </div>
