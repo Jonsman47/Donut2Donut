@@ -19,8 +19,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f7f9fc",
-  colorScheme: "light",
+  themeColor: "#0b0f1a",
+  colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
 };
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body>
         <Providers>
           <div className="app-shell">
