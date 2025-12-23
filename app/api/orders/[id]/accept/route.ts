@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(
     req: NextRequest,
@@ -52,15 +53,13 @@ export async function POST(
         console.log(`[ACCEPT] ONE_TIME listing ${updated.listingId} deactivated for order ${orderId}`);
     }
 
-    await prisma.notification.create({
-        data: {
-            userId: order.buyerId,
-            type: "ORDER_STATUS",
-            data: JSON.stringify({
-                orderId: order.id,
-                status: updated.status,
-            }),
-        },
+    await createNotification({
+        userId: order.buyerId,
+        type: "order",
+        title: "Order accepted",
+        body: `Your order for ${updated.listing.title} was accepted.`,
+        linkUrl: `/market/orders/${order.id}`,
+        metadata: { orderId: order.id, status: updated.status },
     });
 
     return NextResponse.json({ order: updated });

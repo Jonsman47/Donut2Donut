@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { getOrCreateWallet } from "@/lib/wallet";
+
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.id) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const role = (session.user as any).role as string;
+  if (!role || !["ADMIN", "MOD"].includes(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const userId = body?.userId as string | undefined;
+  const deltaPoints = Number(body?.deltaPoints ?? 0);
+  const deltaCents = Number(body?.deltaCents ?? 0);
+
+  if (!userId) {
+    return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+  }
+
+  await getOrCreateWallet(userId);
+
+  const transactions = [] as any[];
+  if (deltaPoints) {
+    transactions.push(
+      prisma.userWallet.update({
+        where: { userId },
+        data: {
+          pointsBalance: { increment: deltaPoints },
+          lifetimePointsEarned: deltaPoints > 0 ? { increment: deltaPoints } : undefined,
+        },
+      }),
+      prisma.pointsLedger.create({
+        data: {
+          userId,
+          source: "admin",
+          deltaPoints,
+          meta: JSON.stringify({ adminId: session.user.id }),
+        },
+      })
+    );
+  }
+
+  if (deltaCents) {
+    transactions.push(
+      prisma.userWallet.update({
+        where: { userId },
+        data: {
+          creditBalanceCents: { increment: deltaCents },
+        },
+      }),
+      prisma.creditLedger.create({
+        data: {
+          userId,
+          source: "admin",
+          deltaCents,
+          meta: JSON.stringify({ adminId: session.user.id }),
+        },
+      })
+    );
+  }
+
+  if (transactions.length === 0) {
+    return NextResponse.json({ error: "No adjustments provided" }, { status: 400 });
+  }
+
+  await prisma.$transaction(transactions);
+
+  return NextResponse.json({ ok: true });
+}

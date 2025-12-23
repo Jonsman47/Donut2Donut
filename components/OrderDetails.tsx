@@ -42,6 +42,7 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
   const [updating, setUpdating] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [tags, setTags] = useState("");
   const [reviewState, setReviewState] = useState<string | null>(null);
 
   const role = useMemo(() => {
@@ -126,7 +127,7 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.id, rating, comment }),
+      body: JSON.stringify({ orderId: order.id, rating, comment, tags }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -135,6 +136,7 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
       setReviewState("Review submitted. Thank you!");
       setOrder((prev) => (prev ? { ...prev, review: { id: "new" } } : prev));
       setComment("");
+      setTags("");
     } catch (err: any) {
       setReviewState(err.message || "Failed to submit review");
     }
@@ -236,6 +238,12 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
                   placeholder="Share feedback for the seller"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
+                />
+                <input
+                  className="input"
+                  placeholder="Optional tags (comma separated)"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
                 />
                 <button className="btn btn-primary" type="button" onClick={handleSubmitReview}>
                   Submit review

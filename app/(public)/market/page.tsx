@@ -14,6 +14,7 @@ type Listing = {
   priceLabel: string;
   sellerName: string;
   trustPercent: number;
+  trustBadge?: string;
   reviewCount: number;
   imageUrl: string;
   type: ListingType;
@@ -92,6 +93,7 @@ export default function MarketPage() {
           priceLabel: (l.priceCents / 100).toFixed(2) + " €",
           sellerName: l.seller?.username ?? "Unknown",
           trustPercent: l.trustPercent ?? 0,
+          trustBadge: l.trustBadge ?? "New/Unrated",
           reviewCount: l.reviewCount ?? 0,
           imageUrl: l.images?.[0]?.url ?? getDonutImage(index),
           type: l.deliveryType === "SERVICE" ? "service" : "item",
@@ -252,6 +254,7 @@ export default function MarketPage() {
           priceLabel: (data.listing.priceCents / 100).toFixed(2) + " €",
           sellerName: session?.user?.name ?? "You",
           trustPercent: 0,
+          trustBadge: "New/Unrated",
           reviewCount: 0,
           imageUrl: coverUrl,
           type: listingType,
@@ -614,6 +617,7 @@ export default function MarketPage() {
                         sellerName={session?.user?.name ?? "You"}
                         sellerVerified
                         trustPercent={88}
+                        trustBadge="Trusted"
                         reviewCount={12}
                         delivery={listingType === "service" ? "Service" : "In-game trade"}
                       />
@@ -658,6 +662,7 @@ export default function MarketPage() {
                     sellerName={listing.sellerName}
                     sellerVerified={listing.trustPercent >= 80}
                     trustPercent={listing.trustPercent}
+                    trustBadge={listing.trustBadge}
                     reviewCount={listing.reviewCount}
                     delivery={listing.delivery}
                     escrowOn={listing.escrowOn}

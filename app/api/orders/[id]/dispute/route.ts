@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(
     req: NextRequest,
@@ -47,16 +48,13 @@ export async function POST(
         }
     })
 
-    await prisma.notification.create({
-        data: {
-            userId: order.buyerId === userId ? order.sellerId : order.buyerId,
-            type: "ORDER_STATUS",
-            data: JSON.stringify({
-                orderId: order.id,
-                status: updated.status,
-                action: "DISPUTE_OPENED"
-            }),
-        },
+    await createNotification({
+        userId: order.buyerId === userId ? order.sellerId : order.buyerId,
+        type: "order",
+        title: "Dispute opened",
+        body: "A dispute was opened on this order.",
+        linkUrl: `/market/orders/${order.id}`,
+        metadata: { orderId: order.id, status: updated.status, action: "DISPUTE_OPENED" },
     });
 
     return NextResponse.json({ order: updated });

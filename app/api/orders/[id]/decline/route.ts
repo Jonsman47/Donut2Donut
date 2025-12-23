@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(
     req: NextRequest,
@@ -45,15 +46,13 @@ export async function POST(
 
     // Notify the other party
     const notifyTarget = order.sellerId === userId ? order.buyerId : order.sellerId;
-    await prisma.notification.create({
-        data: {
-            userId: notifyTarget,
-            type: "ORDER_STATUS",
-            data: JSON.stringify({
-                orderId: order.id,
-                status: updated.status,
-            }),
-        },
+    await createNotification({
+        userId: notifyTarget,
+        type: "order",
+        title: "Order cancelled",
+        body: "An order was cancelled before acceptance.",
+        linkUrl: `/market/orders/${order.id}`,
+        metadata: { orderId: order.id, status: updated.status },
     });
 
     return NextResponse.json({ order: updated });

@@ -18,6 +18,7 @@ export default function OrderPage() {
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
     const [hasUploadedProof, setHasUploadedProof] = useState(false);
+    const [proofs, setProofs] = useState<any[]>([]);
 
     // Fetch order on load and when actions complete
     const fetchOrder = async () => {
@@ -35,6 +36,7 @@ export default function OrderPage() {
             if (myProofs.length > 0) {
                 setHasUploadedProof(true);
             }
+            setProofs(data.order.deliveryProofs || []);
         } catch (err) {
             console.error(err);
         } finally {
@@ -223,6 +225,7 @@ export default function OrderPage() {
                                         <div className="stack-10">
                                             <h3 className="h3">Proofs & Validation</h3>
                                             <ProofUpload orderId={orderId} onProofUploaded={() => setHasUploadedProof(true)} />
+                                            <ProofList proofs={proofs} orderId={orderId} isBuyer={isBuyer} onUpdate={fetchOrder} />
 
                                             <div style={{ marginTop: 12 }}>
                                                 <div className="grid-2" style={{ gap: 12, marginBottom: 16 }}>
@@ -430,6 +433,68 @@ function ProofUpload({ orderId, onProofUploaded }: { orderId: string; onProofUpl
     );
 }
 
+function ProofList({
+    proofs,
+    orderId,
+    isBuyer,
+    onUpdate,
+}: {
+    proofs: any[];
+    orderId: string;
+    isBuyer: boolean;
+    onUpdate: () => void;
+}) {
+    if (!proofs.length) {
+        return (
+            <div className="muted" style={{ fontSize: "0.85rem" }}>
+                No proofs uploaded yet.
+            </div>
+        );
+    }
+
+    async function acceptProof(proofId: string) {
+        const res = await fetch(`/api/orders/${orderId}/proof/accept`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ proofId }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert(data.error || "Failed to accept proof");
+            return;
+        }
+        onUpdate();
+    }
+
+    return (
+        <div className="stack-6">
+            <div className="kicker">Uploaded proofs</div>
+            <div className="stack-6">
+                {proofs.map((proof) => (
+                    <div key={proof.id} className="surface" style={{ padding: 12, borderRadius: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                            <div className="stack-4">
+                                <strong>{proof.kind}</strong>
+                                <a className="muted" href={proof.url} target="_blank" rel="noreferrer">
+                                    View proof
+                                </a>
+                            </div>
+                            <span className={`badge ${proof.status === "ACCEPTED" ? "badge-good" : proof.status === "REJECTED" ? "badge-warn" : "badge-blue"}`}>
+                                {proof.status}
+                            </span>
+                        </div>
+                        {isBuyer && proof.status === "PENDING" && (
+                            <button className="btn btn-secondary" type="button" onClick={() => acceptProof(proof.id)}>
+                                Accept proof
+                            </button>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 function TradeChat({ orderId, userId }: { orderId: string; userId: string }) {
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
@@ -575,4 +640,3 @@ function TradeChat({ orderId, userId }: { orderId: string; userId: string }) {
         </div>
     );
 }
-
