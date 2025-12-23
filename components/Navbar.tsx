@@ -6,6 +6,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import ThemeToggle from "./ThemeToggle";
 
+interface NavItemBase {
+  label: string;
+  show?: boolean;
+  badge?: number;
+}
+
+interface NavItemWithHref extends NavItemBase {
+  href: string;
+  action?: never;
+}
+
+interface NavItemWithAction extends NavItemBase {
+  href?: never;
+  action: () => void;
+}
+
+type NavItem = NavItemWithHref | NavItemWithAction;
+
+interface NavSection {
+  key: string;
+  label: string;
+  href?: string;
+  isActive: boolean;
+  items?: NavItem[];
+  noDropdown?: boolean;
+}
+
 const UNREAD_POLL_INTERVAL = 5000;
 const NOTIFICATIONS_PREVIEW_LIMIT = 6;
 const NAV_OPEN_DELAY = 75;
@@ -134,6 +161,7 @@ export default function Navbar() {
   };
 
   const scheduleOpenMenu = (menuKey: string) => {
+    if (['home', 'market'].includes(menuKey)) return; // Ne rien faire pour Home et Market
     clearCloseTimeout();
     clearOpenTimeout();
     openTimeoutRef.current = setTimeout(() => {
@@ -142,6 +170,7 @@ export default function Navbar() {
   };
 
   const scheduleCloseMenu = () => {
+    if (['home', 'market'].includes(openMenu || '')) return; // Ne rien faire pour Home et Market
     clearOpenTimeout();
     clearCloseTimeout();
     closeTimeoutRef.current = setTimeout(() => {
@@ -149,58 +178,63 @@ export default function Navbar() {
     }, NAV_CLOSE_DELAY);
   };
 
-  const navSections = [
+  const navSections: NavSection[] = [
     {
       key: "home",
       label: "Home",
-      isActive: pathname === "/" || pathname.startsWith("/dashboard") || pathname.startsWith("/notifications"),
-      items: [
-        { label: "Home", href: "/" },
-        { label: "Dashboard", href: "/dashboard", show: status === "authenticated" },
-        { label: "Get started", href: "/verify", show: showGetStarted },
-        { label: "Notifications", href: "/notifications", show: status === "authenticated" },
-      ],
+      href: "/",
+      isActive: pathname === "/",
+      noDropdown: true
     },
     {
       key: "market",
       label: "Market",
-      isActive: pathname.startsWith("/market") || pathname.startsWith("/listing") || pathname.startsWith("/seller"),
-      items: [
-        { label: "Browse market", href: "/market" },
-        { label: "My listings (Sell)", href: "/market/sales", show: status === "authenticated" },
-        { label: "Orders (as buyer)", href: "/market/orders", show: status === "authenticated", badge: counts?.activeOrders },
-        { label: "Sales (as seller)", href: "/market/sales", show: status === "authenticated", badge: counts?.pendingSales },
-        { label: "Reviews", href: "/reviews" },
-      ],
+      href: "/market",
+      isActive: pathname.startsWith("/market"),
+      noDropdown: true
     },
     {
       key: "wallet",
       label: "Wallet",
-      isActive: pathname.startsWith("/wallet") || pathname.startsWith("/wheel"),
+      isActive: pathname.startsWith("/wallet"),
       items: [
         { label: "Balance overview", href: "/wallet" },
-        { label: "Points", href: "/wallet#points" },
-        { label: "Credits", href: "/wallet#credits" },
-        { label: "Daily wheel", href: "/wheel" },
-        { label: "Transactions history", href: "/wallet#transactions" },
+        { label: "Transactions", href: "/wallet#transactions" },
       ],
     },
     {
       key: "account",
       label: "Account",
-      isActive: pathname.startsWith("/verify") || pathname.startsWith("/dashboard/settings"),
+      isActive: pathname.startsWith("/dashboard/settings"),
       items: [
         { label: "Profile", href: username ? `/seller/${username}` : "/dashboard", show: status === "authenticated" },
-        { label: "Verification / Finish setup", href: "/verify", show: status === "authenticated" },
         { label: "Settings", href: "/dashboard/settings", show: status === "authenticated" },
-        { label: "Rules / TOS", href: "/rules" },
         { label: "Sign out", action: () => signOut({ callbackUrl: "/" }), show: status === "authenticated" },
       ],
     },
   ];
 
   return (
-    <header className="site-header" style={{ animation: 'fadeDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+    <>
+      <style jsx>{`
+        .nav-item.no-dropdown .nav-trigger.no-dropdown {
+          cursor: pointer;
+          background: transparent;
+          border: none;
+          font-size: inherit;
+          color: inherit;
+          padding: 0;
+          text-decoration: none;
+        }
+        .nav-item.no-dropdown .nav-trigger.no-dropdown:hover {
+          background: transparent !important;
+          transform: none !important;
+        }
+        .nav-item.no-dropdown::after {
+          display: none !important;
+        }
+      `}</style>
+      <header className="site-header" style={{ animation: 'fadeDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
       <div className="container site-nav">
         <Link href="/" className="stack-4" style={{ minWidth: 160 }}>
           <span style={{ fontWeight: 700, letterSpacing: "-0.01em" }}>
@@ -213,56 +247,66 @@ export default function Navbar() {
 
         <nav className="nav-links">
           {navSections.map((section) => {
-            const visibleItems = section.items.filter((item) => item.show !== false);
+            const visibleItems = section.items ? section.items.filter((item) => item.show !== false) : [];
             return (
               <div
                 key={section.key}
-                className={`nav-item${section.isActive ? " active" : ""}${openMenu === section.key ? " open" : ""}`}
-                onMouseEnter={() => scheduleOpenMenu(section.key)}
-                onMouseLeave={scheduleCloseMenu}
+                className={`nav-item${section.isActive ? " active" : ""}${!section.noDropdown && openMenu === section.key ? " open" : ""}${section.noDropdown ? " no-dropdown" : ""}`}
+                onMouseEnter={section.noDropdown ? undefined : () => scheduleOpenMenu(section.key)}
+                onMouseLeave={section.noDropdown ? undefined : scheduleCloseMenu}
               >
-                <button
-                  className="nav-trigger"
-                  type="button"
-                  onClick={() => {
-                    clearOpenTimeout();
-                    clearCloseTimeout();
-                    setOpenMenu((prev) => (prev === section.key ? null : section.key));
-                  }}
-                >
-                  {section.label}
-                </button>
-                <div className="nav-dropdown">
-                  {visibleItems.map((item) =>
-                    item.href ? (
-                      <Link
-                        key={`${section.key}-${item.label}`}
-                        href={item.href}
-                        className="nav-dropdown-item"
-                        onClick={() => setOpenMenu(null)}
-                      >
-                        <span>{item.label}</span>
-                        {!!item.badge && item.badge > 0 && (
-                          <span className="badge badge-warn" style={{ marginLeft: 6 }}>
-                            {item.badge}
-                          </span>
+                {section.noDropdown ? (
+                  <Link href={section.href || "#"} className="nav-trigger no-dropdown">
+                    {section.label}
+                  </Link>
+                ) : (
+                  <>
+                    <button
+                      className="nav-trigger"
+                      type="button"
+                      onClick={() => {
+                        clearOpenTimeout();
+                        clearCloseTimeout();
+                        setOpenMenu((prev) => (prev === section.key ? null : section.key));
+                      }}
+                    >
+                      {section.label}
+                    </button>
+                    {visibleItems.length > 0 && (
+                      <div className="nav-dropdown">
+                        {visibleItems.map((item) =>
+                          item.href ? (
+                            <Link
+                              key={`${section.key}-${item.label}`}
+                              href={item.href}
+                              className="nav-dropdown-item"
+                              onClick={() => setOpenMenu(null)}
+                            >
+                              <span>{item.label}</span>
+                              {!!item.badge && item.badge > 0 && (
+                                <span className="badge badge-warn" style={{ marginLeft: 6 }}>
+                                  {item.badge}
+                                </span>
+                              )}
+                            </Link>
+                          ) : (
+                            <button
+                              key={`${section.key}-${item.label}`}
+                              className="nav-dropdown-item"
+                              type="button"
+                              onClick={() => {
+                                setOpenMenu(null);
+                                item.action?.();
+                              }}
+                            >
+                              {item.label}
+                            </button>
+                          )
                         )}
-                      </Link>
-                    ) : (
-                      <button
-                        key={`${section.key}-${item.label}`}
-                        className="nav-dropdown-item"
-                        type="button"
-                        onClick={() => {
-                          setOpenMenu(null);
-                          item.action?.();
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    )
-                  )}
-                </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             );
           })}
@@ -396,5 +440,6 @@ export default function Navbar() {
         </div>
       </div>
     </header>
+    </>
   );
 }
