@@ -47,7 +47,7 @@ export default function WalletPage() {
         </div>
 
         <div className="grid-2" style={{ gap: 12 }}>
-          <div className="surface" style={{ padding: 18, borderRadius: 18 }}>
+          <div id="points" className="surface" style={{ padding: 18, borderRadius: 18 }}>
             <div className="stack-6">
               <strong>Points balance</strong>
               <div className="h2" style={{ margin: 0 }}>
@@ -56,7 +56,7 @@ export default function WalletPage() {
               <div className="muted">Lifetime earned: {wallet?.lifetimePointsEarned ?? 0}</div>
             </div>
           </div>
-          <div className="surface" style={{ padding: 18, borderRadius: 18 }}>
+          <div id="credits" className="surface" style={{ padding: 18, borderRadius: 18 }}>
             <div className="stack-6">
               <strong>Credit balance</strong>
               <div className="h2" style={{ margin: 0 }}>
@@ -66,6 +66,13 @@ export default function WalletPage() {
                 Lifetime discount: {(wallet?.lifetimeDiscountBps ?? 0) / 10}%
               </div>
             </div>
+          </div>
+        </div>
+
+        <div id="transactions" className="surface" style={{ padding: 18, borderRadius: 18 }}>
+          <div className="stack-6">
+            <strong>Transactions history</strong>
+            <div className="muted">Transaction history will appear here.</div>
           </div>
         </div>
 

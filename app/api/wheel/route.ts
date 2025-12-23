@@ -33,6 +33,10 @@ function getDayKey(date = new Date()) {
 
 export async function GET() {
   const session = await getServerSession(authOptions);
+  console.log("[WHEEL][GET] session", {
+    userId: session?.user?.id ?? null,
+    hasSession: Boolean(session),
+  });
   if (!session || !session.user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -53,6 +57,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
+  console.log("[WHEEL][POST] session", {
+    userId: session?.user?.id ?? null,
+    hasSession: Boolean(session),
+  });
   if (!session || !session.user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

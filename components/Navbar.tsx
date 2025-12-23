@@ -2,20 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import ThemeToggle from "./ThemeToggle";
-
-const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/market", label: "Market" },
-  { href: "/market/orders", label: "Orders" },
-  { href: "/market/sales", label: "Sales" },
-  { href: "/wheel", label: "Wheel" },
-  { href: "/wallet", label: "Wallet" },
-  { href: "/reviews", label: "Reviews" },
-  { href: "/rules", label: "Rules" },
-];
 
 const UNREAD_POLL_INTERVAL = 5000;
 const NOTIFICATIONS_PREVIEW_LIMIT = 6;
@@ -31,6 +20,13 @@ export default function Navbar() {
   } | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<{ setupComplete: boolean } | null>(null);
+
+  const username = useMemo(() => {
+    const user = session?.user as any;
+    return user?.username ?? user?.name ?? null;
+  }, [session]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -80,6 +76,84 @@ export default function Navbar() {
     };
   }, [showNotifications, status]);
 
+  useEffect(() => {
+    setOpenMenu(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setVerifyStatus(null);
+      return;
+    }
+    let active = true;
+    async function loadVerifyStatus() {
+      try {
+        const res = await fetch("/api/verify/status");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) setVerifyStatus({ setupComplete: Boolean(data.setupComplete) });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadVerifyStatus();
+    return () => {
+      active = false;
+    };
+  }, [status]);
+
+  const showGetStarted = status === "authenticated" && verifyStatus && !verifyStatus.setupComplete;
+
+  const navSections = [
+    {
+      key: "home",
+      label: "Home",
+      isActive: pathname === "/" || pathname.startsWith("/dashboard") || pathname.startsWith("/notifications"),
+      items: [
+        { label: "Home", href: "/" },
+        { label: "Dashboard", href: "/dashboard", show: status === "authenticated" },
+        { label: "Get started", href: "/verify", show: showGetStarted },
+        { label: "Notifications", href: "/notifications", show: status === "authenticated" },
+      ],
+    },
+    {
+      key: "market",
+      label: "Market",
+      isActive: pathname.startsWith("/market") || pathname.startsWith("/listing") || pathname.startsWith("/seller"),
+      items: [
+        { label: "Browse market", href: "/market" },
+        { label: "My listings (Sell)", href: "/market/sales", show: status === "authenticated" },
+        { label: "Orders (as buyer)", href: "/market/orders", show: status === "authenticated", badge: counts?.activeOrders },
+        { label: "Sales (as seller)", href: "/market/sales", show: status === "authenticated", badge: counts?.pendingSales },
+        { label: "Reviews", href: "/reviews" },
+      ],
+    },
+    {
+      key: "wallet",
+      label: "Wallet",
+      isActive: pathname.startsWith("/wallet") || pathname.startsWith("/wheel"),
+      items: [
+        { label: "Balance overview", href: "/wallet" },
+        { label: "Points", href: "/wallet#points" },
+        { label: "Credits", href: "/wallet#credits" },
+        { label: "Daily wheel", href: "/wheel" },
+        { label: "Transactions history", href: "/wallet#transactions" },
+      ],
+    },
+    {
+      key: "account",
+      label: "Account",
+      isActive: pathname.startsWith("/verify") || pathname.startsWith("/dashboard/settings"),
+      items: [
+        { label: "Profile", href: username ? `/seller/${username}` : "/dashboard", show: status === "authenticated" },
+        { label: "Verification / Finish setup", href: "/verify", show: status === "authenticated" },
+        { label: "Settings", href: "/dashboard/settings", show: status === "authenticated" },
+        { label: "Rules / TOS", href: "/rules" },
+        { label: "Sign out", action: () => signOut({ callbackUrl: "/" }), show: status === "authenticated" },
+      ],
+    },
+  ];
+
   return (
     <header className="site-header">
       <div className="container site-nav">
@@ -93,28 +167,53 @@ export default function Navbar() {
         </Link>
 
         <nav className="nav-links">
-          {navLinks.map((link) => {
-            const isActive = pathname === link.href;
-            const badge =
-              link.href === "/market/sales"
-                ? counts?.pendingSales
-                : link.href === "/market/orders"
-                  ? counts?.activeOrders
-                  : 0;
+          {navSections.map((section) => {
+            const visibleItems = section.items.filter((item) => item.show !== false);
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`nav-link${isActive ? " active" : ""}`}
-                style={{ display: "inline-flex", alignItems: "center" }}
+              <div
+                key={section.key}
+                className={`nav-item${section.isActive ? " active" : ""}${openMenu === section.key ? " open" : ""}`}
+                onMouseLeave={() => setOpenMenu(null)}
               >
-                <span>{link.label}</span>
-                {!!badge && badge > 0 && (
-                  <span className="badge badge-warn" style={{ marginLeft: 6 }}>
-                    {badge}
-                  </span>
-                )}
-              </Link>
+                <button
+                  className="nav-trigger"
+                  type="button"
+                  onClick={() => setOpenMenu((prev) => (prev === section.key ? null : section.key))}
+                >
+                  {section.label}
+                </button>
+                <div className="nav-dropdown">
+                  {visibleItems.map((item) =>
+                    item.href ? (
+                      <Link
+                        key={`${section.key}-${item.label}`}
+                        href={item.href}
+                        className="nav-dropdown-item"
+                        onClick={() => setOpenMenu(null)}
+                      >
+                        <span>{item.label}</span>
+                        {!!item.badge && item.badge > 0 && (
+                          <span className="badge badge-warn" style={{ marginLeft: 6 }}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    ) : (
+                      <button
+                        key={`${section.key}-${item.label}`}
+                        className="nav-dropdown-item"
+                        type="button"
+                        onClick={() => {
+                          setOpenMenu(null);
+                          item.action?.();
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
             );
           })}
         </nav>
@@ -242,19 +341,8 @@ export default function Navbar() {
                 </span>
                 <span className="muted" style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Balance</span>
               </div>
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => signOut({ callbackUrl: "/" })}
-              >
-                Sign out
-              </button>
             </div>
           )}
-
-          <Link className="btn btn-primary" href="/market">
-            Get started
-          </Link>
         </div>
       </div>
     </header>

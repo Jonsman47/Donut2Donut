@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     const listing = await prisma.listing.findUnique({
       where: { id: body.listingId },
-      include: { seller: true },
+      include: { seller: { select: { id: true } } },
     });
 
     if (!listing) {
@@ -181,8 +181,8 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       listing: { include: { images: true } },
-      buyer: true,
-      seller: true,
+      buyer: { select: { id: true, username: true, image: true } },
+      seller: { select: { id: true, username: true, image: true } },
     },
     orderBy: { createdAt: "desc" },
   });
