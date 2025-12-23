@@ -4,3 +4,5 @@ node_modules/
 .DS_Store
 note.txt
 .agent/
+prisma/dev.db
+prisma/dev.db-journal

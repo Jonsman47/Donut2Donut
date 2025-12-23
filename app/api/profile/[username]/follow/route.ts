@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(
@@ -9,7 +9,7 @@ export async function POST(
 ) {
   const session = await getServerSession(authOptions);
   
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Vous devez être connecté pour effectuer cette action' },
       { status: 401 }
@@ -33,7 +33,7 @@ export async function POST(
     }
 
     // Vérifier si l'utilisateur ne s'ajoute pas lui-même
-    if (session.user.email === userToFollow.id) {
+    if (session.user.id === userToFollow.id) {
       return NextResponse.json(
         { error: 'Vous ne pouvez pas vous suivre vous-même' },
         { status: 400 }
@@ -41,10 +41,10 @@ export async function POST(
     }
 
     // Vérifier si l'utilisateur suit déjà
-    const existingFollow = await prisma.follows.findUnique({
+    const existingFollow = await prisma.follow.findUnique({
       where: {
         followerId_followingId: {
-          followerId: session.user.email,
+          followerId: session.user.id,
           followingId: userToFollow.id
         }
       }
@@ -54,10 +54,10 @@ export async function POST(
 
     if (existingFollow) {
       // Si l'utilisateur suit déjà, supprimer le suivi
-      await prisma.follows.delete({
+      await prisma.follow.delete({
         where: {
           followerId_followingId: {
-            followerId: session.user.email,
+            followerId: session.user.id,
             followingId: userToFollow.id
           }
         }
@@ -65,30 +65,20 @@ export async function POST(
       isFollowing = false;
     } else {
       // Sinon, ajouter le suivi
-      await prisma.follows.create({
+      await prisma.follow.create({
         data: {
-          follower: { connect: { email: session.user.email } },
+          follower: { connect: { id: session.user.id } },
           following: { connect: { id: userToFollow.id } }
         }
       });
       isFollowing = true;
     }
 
-    // Mettre à jour les statistiques
-    await prisma.sellerStats.upsert({
-      where: { userId: userToFollow.id },
-      update: {
-        followersCount: {
-          [isFollowing ? 'increment' : 'decrement']: 1
-        }
-      },
-      create: {
-        user: { connect: { id: userToFollow.id } },
-        followersCount: 1
-      }
+    const followersCount = await prisma.follow.count({
+      where: { followingId: userToFollow.id }
     });
 
-    return NextResponse.json({ isFollowing });
+    return NextResponse.json({ isFollowing, followersCount });
 
   } catch (error) {
     console.error('Erreur lors de la mise à jour du suivi:', error);

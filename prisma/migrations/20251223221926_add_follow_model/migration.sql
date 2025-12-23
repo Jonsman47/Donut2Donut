@@ -1,0 +1,1 @@
+-- No-op migration to keep alignment after follow model introduction.
