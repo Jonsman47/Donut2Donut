@@ -1,3 +1,7 @@
+"use client";
+
+import { useScrollReveal } from "@/hooks/useScrollReveal";
+
 const reviews = [
   {
     name: "@mineshaft",
@@ -17,23 +21,22 @@ const reviews = [
 ];
 
 export default function ReviewsStrip() {
+  const { ref, isVisible } = useScrollReveal(0.2);
+
   return (
-    <section className="section reviews-section">
-      <div className="container">
-        <div className="section-header reviews-header">
-          <h2 className="h2">What our community says</h2>
-        </div>
+    <section className="section reviews-section perspective-1000" ref={ref}>
+      <div className="container preserve-3d">
+        <h2 className={`h2 reveal ${isVisible ? 'is-visible' : ''}`} style={{ marginBottom: 32 }}>What traders say</h2>
         <div className="reviews-grid">
-          {reviews.map((review) => (
-            <div key={review.name} className="review-card glass-card">
-              <div className="review-stars" aria-hidden="true">
-                {"★★★★★"}
-              </div>
-              <div className="review-text">“{review.text}”</div>
-              <div className="review-meta">
-                <span className="review-name">{review.name}</span>
-                <span className="review-date">{review.date}</span>
-              </div>
+          {reviews.map((r, i) => (
+            <div
+              key={i}
+              className={`review-card glass-card reveal tilt-6 ${isVisible ? 'is-visible' : ''}`}
+              style={{ transitionDelay: `${i * 150}ms` }}
+            >
+              <div className="review-stars" style={{ color: '#fbbf24', fontSize: '1.2rem' }}>{"★★★★★"}</div>
+              <p className="p" style={{ fontSize: '1.05rem', fontStyle: 'italic', opacity: 0.9 }}>"{r.text}"</p>
+              <div className="muted" style={{ fontWeight: 600 }}>— {r.name}</div>
             </div>
           ))}
         </div>
