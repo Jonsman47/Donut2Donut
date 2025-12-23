@@ -1,15 +1,15 @@
 import Hero from "@/components/Hero";
-import FeaturedTrades from "@/components/FeaturedTrades";
-import EscrowStepper from "@/components/EscrowStepper";
-import TrustStrip from "@/components/TrustStrip";
+import EscrowHowItWorks from "@/components/EscrowHowItWorks";
+import ReviewsStrip from "@/components/ReviewsStrip";
+import FinalCTA from "@/components/FinalCTA";
 
 export default function Home() {
   return (
     <div>
       <Hero />
-      <FeaturedTrades />
-      <EscrowStepper />
-      <TrustStrip />
+      <EscrowHowItWorks />
+      <ReviewsStrip />
+      <FinalCTA />
     </div>
   );
 }
