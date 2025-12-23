@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
+import { refreshSellerStats } from "@/lib/seller-stats";
 
 export async function POST(
     req: NextRequest,
@@ -94,17 +96,37 @@ export async function POST(
             data: dataToUpdate,
         });
 
-        await prisma.notification.create({
-            data: {
-                userId: order.buyerId === userId ? order.sellerId : order.buyerId,
-                type: "ORDER_STATUS",
-                data: JSON.stringify({
-                    orderId: order.id,
-                    status: (updated as any).status,
-                    action: "CONFIRMED_EXCHANGE"
-                }),
-            },
+        const otherParty = order.buyerId === userId ? order.sellerId : order.buyerId;
+        await createNotification({
+            userId: otherParty,
+            type: "order",
+            title: "Order confirmed",
+            body: "The other party confirmed the exchange.",
+            linkUrl: `/market/orders/${order.id}`,
+            metadata: { orderId: order.id, status: (updated as any).status, action: "CONFIRMED_EXCHANGE" },
         });
+
+        if ((updated as any).status === "COMPLETED") {
+            await Promise.all([
+                createNotification({
+                    userId: order.sellerId,
+                    type: "order",
+                    title: "Order completed",
+                    body: `Order ${order.id.slice(-6)} is completed.`,
+                    linkUrl: `/market/orders/${order.id}`,
+                    metadata: { orderId: order.id, status: "COMPLETED" },
+                }),
+                createNotification({
+                    userId: order.buyerId,
+                    type: "order",
+                    title: "Order completed",
+                    body: `Order ${order.id.slice(-6)} is completed.`,
+                    linkUrl: `/market/orders/${order.id}`,
+                    metadata: { orderId: order.id, status: "COMPLETED" },
+                }),
+                refreshSellerStats(order.sellerId),
+            ]);
+        }
 
         console.log(`[CONFIRM] Success for ${userId} on ${orderId}. Status=${updated.status}`);
         return NextResponse.json({ order: updated });

@@ -11,10 +11,14 @@ const navLinks = [
   { href: "/market", label: "Market" },
   { href: "/market/orders", label: "Orders" },
   { href: "/market/sales", label: "Sales" },
+  { href: "/wheel", label: "Wheel" },
+  { href: "/wallet", label: "Wallet" },
+  { href: "/reviews", label: "Reviews" },
   { href: "/rules", label: "Rules" },
 ];
 
 const UNREAD_POLL_INTERVAL = 5000;
+const NOTIFICATIONS_PREVIEW_LIMIT = 6;
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -23,7 +27,10 @@ export default function Navbar() {
     pendingSales: number;
     activeOrders: number;
     balanceCents: number;
+    unreadNotifications: number;
   } | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -51,6 +58,27 @@ export default function Navbar() {
       clearInterval(interval);
     };
   }, [status]);
+
+  useEffect(() => {
+    if (!showNotifications || status !== "authenticated") return;
+    let active = true;
+    async function loadNotifications() {
+      try {
+        const res = await fetch(
+          `/api/notifications?page=1&pageSize=${NOTIFICATIONS_PREVIEW_LIMIT}&t=${Date.now()}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) setNotifications(data.notifications || []);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadNotifications();
+    return () => {
+      active = false;
+    };
+  }, [showNotifications, status]);
 
   return (
     <header className="site-header">
@@ -116,6 +144,98 @@ export default function Navbar() {
 
           {status === "authenticated" && (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ position: "relative" }}>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => setShowNotifications((prev) => !prev)}
+                  aria-label="Notifications"
+                >
+                  🔔
+                  {!!counts?.unreadNotifications && counts.unreadNotifications > 0 && (
+                    <span className="badge badge-warn" style={{ marginLeft: 6 }}>
+                      {counts.unreadNotifications}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <div
+                    className="surface"
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: "calc(100% + 8px)",
+                      minWidth: 280,
+                      zIndex: 50,
+                      padding: 12,
+                      borderRadius: 14,
+                      boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
+                    }}
+                  >
+                    <div className="stack-6">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <strong>Notifications</strong>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={async () => {
+                            await fetch("/api/notifications/mark-all", { method: "POST" });
+                            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+                            setCounts((prev) => (prev ? { ...prev, unreadNotifications: 0 } : prev));
+                          }}
+                        >
+                          Mark all read
+                        </button>
+                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="muted">No notifications yet.</div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <Link
+                            key={notification.id}
+                            href={notification.linkUrl || "/notifications"}
+                            className="card"
+                            style={{
+                              padding: 10,
+                              borderRadius: 12,
+                              background: notification.isRead ? "var(--card)" : "rgba(120,170,255,0.14)",
+                              textDecoration: "none",
+                            }}
+                            onClick={async () => {
+                              if (!notification.isRead) {
+                                await fetch(`/api/notifications/${notification.id}/read`, { method: "POST" });
+                                setCounts((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        unreadNotifications: Math.max(prev.unreadNotifications - 1, 0),
+                                      }
+                                    : prev
+                                );
+                              }
+                              setShowNotifications(false);
+                            }}
+                          >
+                            <div style={{ fontWeight: 600 }}>{notification.title}</div>
+                            <div className="muted" style={{ fontSize: "0.75rem" }}>
+                              {notification.body}
+                            </div>
+                          </Link>
+                        ))
+                      )}
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <Link className="btn btn-secondary" href="/notifications">
+                          View all
+                        </Link>
+                        <button className="btn btn-ghost" type="button" onClick={() => setShowNotifications(false)}>
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="btn btn-ghost" style={{ cursor: "default", display: "flex", alignItems: "center", gap: 8, pointerEvents: "none" }}>
                 <span style={{ fontWeight: 600, color: "var(--primary)" }}>
                   {(counts?.balanceCents ?? 0) / 100} €

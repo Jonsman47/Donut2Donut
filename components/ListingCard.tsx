@@ -11,6 +11,7 @@ type Props = {
   sellerName: string;
   sellerVerified?: boolean;
   trustPercent?: number;
+  trustBadge?: string;
   reviewCount?: number;
   delivery?: string;
   escrowOn?: boolean;
@@ -26,6 +27,7 @@ export default function ListingCard({
   sellerName,
   sellerVerified = false,
   trustPercent = 0,
+  trustBadge = "New/Unrated",
   reviewCount = 0,
   delivery = "Instant",
   escrowOn = true,
@@ -67,7 +69,7 @@ export default function ListingCard({
               gap: 8,
             }}
           >
-            <span className={`badge ${trustTone}`}>Trust {trustPercent}%</span>
+            <span className={`badge ${trustTone}`}>{trustBadge} • {trustPercent}%</span>
             {escrowOn ? (
               <span className="badge badge-good">Escrow</span>
             ) : (

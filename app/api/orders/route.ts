@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const quantity = body.quantity && body.quantity > 0 ? body.quantity : 1;
+    const couponId = body.couponId as string | undefined;
 
     const listing = await prisma.listing.findUnique({
       where: { id: body.listingId },
@@ -75,7 +77,32 @@ export async function POST(req: NextRequest) {
 
     const unitPriceCents = listing.priceCents;
     const subtotalCents = unitPriceCents * quantity;
-    const totalCents = subtotalCents;
+
+    const wallet = await prisma.userWallet.findUnique({ where: { userId: buyerId } });
+    let couponDiscountCents = 0;
+    let lifetimeDiscountCents = 0;
+    let appliedCouponId: string | null = null;
+
+    if (couponId) {
+      const coupon = await prisma.userCoupon.findFirst({
+        where: { id: couponId, userId: buyerId, isUsed: false },
+      });
+      if (!coupon) {
+        return NextResponse.json({ error: "Coupon invalid or already used" }, { status: 400 });
+      }
+      couponDiscountCents = Math.round(unitPriceCents * (coupon.valuePercent / 100));
+      appliedCouponId = coupon.id;
+    }
+
+    if (wallet?.lifetimeDiscountBps) {
+      const lifetimeRate = wallet.lifetimeDiscountBps / 1000;
+      lifetimeDiscountCents = Math.round((subtotalCents - couponDiscountCents) * lifetimeRate);
+    }
+
+    const rawDiscountCents = couponDiscountCents + lifetimeDiscountCents;
+    const discountCap = Math.round(subtotalCents * 0.3);
+    const discountCents = Math.min(rawDiscountCents, discountCap);
+    const totalCents = Math.max(subtotalCents - discountCents, 0);
     const platformFeeCents = Math.round(totalCents * 0.1);
 
     console.log(`[ORDER_CREATE] listing.priceCents=${listing.priceCents}, quantity=${quantity}, totalCents=${totalCents}, fee=${platformFeeCents}`);
@@ -89,22 +116,29 @@ export async function POST(req: NextRequest) {
         unitPriceCents,
         subtotalCents,
         platformFeeCents,
+        discountCents,
         totalCents,
+        couponId: appliedCouponId,
         status: "REQUESTED",
         safeTradeCode: null,
         buyerDisputeDeadline: null,
       } as any,
     });
 
-    await prisma.notification.create({
-      data: {
-        userId: listing.sellerId,
-        type: "ORDER_STATUS",
-        data: JSON.stringify({
-          orderId: order.id,
-          status: order.status,
-        }),
-      },
+    if (appliedCouponId) {
+      await prisma.userCoupon.update({
+        where: { id: appliedCouponId },
+        data: { isUsed: true, usedAt: new Date(), orderIdUsedOn: order.id },
+      });
+    }
+
+    await createNotification({
+      userId: listing.sellerId,
+      type: "order",
+      title: "New purchase request",
+      body: `New request for ${listing.title}.`,
+      linkUrl: `/market/orders/${order.id}`,
+      metadata: { orderId: order.id, status: order.status },
     });
 
     return NextResponse.json({ order });

@@ -48,9 +48,14 @@ export async function GET() {
 
   console.log(`[UNREAD] User ${userId}: Sales=${pendingSales}, Orders=${activeOrders}, Balance=${user?.balanceCents}`);
 
+  const unreadNotifications = await prisma.notification.count({
+    where: { userId, isRead: false },
+  });
+
   return NextResponse.json({
     pendingSales,
     activeOrders,
-    balanceCents: (user as any)?.balanceCents ?? 0
+    balanceCents: (user as any)?.balanceCents ?? 0,
+    unreadNotifications,
   });
 }

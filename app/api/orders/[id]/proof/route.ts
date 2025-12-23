@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(
     req: NextRequest,
@@ -38,7 +39,18 @@ export async function POST(
             userId,
             kind: body.kind,
             url: body.url,
+            status: "PENDING",
         },
+    });
+
+    const notifyTarget = order.buyerId === userId ? order.sellerId : order.buyerId;
+    await createNotification({
+        userId: notifyTarget,
+        type: "order",
+        title: "Proof uploaded",
+        body: "New delivery proof was uploaded for review.",
+        linkUrl: `/market/orders/${order.id}`,
+        metadata: { orderId: order.id, proofId: proof.id },
     });
 
     return NextResponse.json({ proof });

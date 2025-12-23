@@ -24,6 +24,7 @@ model User {
   ordersBuy      Order[]        @relation("BuyerOrders")
   ordersSell     Order[]        @relation("SellerOrders")
   notifications  Notification[]
+  siteReviews    SiteReview[]
   reviewsGiven   Review[]       @relation("ReviewsGiven")
   reviewsGot     Review[]       @relation("ReviewsGot")
   reportsMade    Report[]       @relation("ReportsMade")
@@ -31,7 +32,14 @@ model User {
   disputesOpened Dispute[]      @relation("DisputesOpened")
   trustEvents    TrustEvent[]
   tradeMessages  TradeMessage[]
-  deliveryProofs DeliveryProof[]
+  deliveryProofs DeliveryProof[] @relation("ProofUploader")
+  reviewedProofs DeliveryProof[] @relation("ProofReviewer")
+  wallet         UserWallet?
+  pointsLedger   PointsLedger[]
+  creditLedger   CreditLedger[]
+  wheelSpins     WheelSpin[]
+  coupons        UserCoupon[]
+  sellerStats    SellerStats?
 
 }
 
@@ -143,6 +151,7 @@ model Order {
   unitPriceCents   Int
   subtotalCents    Int
   platformFeeCents Int @default(0)
+  discountCents    Int @default(0)
   totalCents       Int
 
   status String @default("REQUESTED")
@@ -159,6 +168,8 @@ model Order {
   stripeTransferId      String?
   escrowFundedAt        DateTime?
   releasedAt            DateTime?
+
+  couponId String?
 
   buyerConfirmedAt      DateTime?
   sellerConfirmedAt     DateTime?
@@ -179,8 +190,12 @@ model Notification {
   user   User @relation(fields: [userId], references: [id])
 
   type   String
-  data   String
-  readAt DateTime?
+  title   String
+  body    String
+  linkUrl String?
+  isRead  Boolean  @default(false)
+  readAt  DateTime?
+  metadata String? // JSON text
 
   createdAt DateTime @default(now())
 }
@@ -191,12 +206,16 @@ model DeliveryProof {
   order   Order  @relation(fields: [orderId], references: [id])
 
   userId String
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation("ProofUploader", fields: [userId], references: [id])
 
-  kind String // screenshot | video | file | message | code_log
-  url  String
-  hash String?
-  meta String? // JSON text
+  kind   String // screenshot | video | file | message | code_log
+  url    String
+  hash   String?
+  meta   String? // JSON text
+  status String @default("PENDING") // PENDING | ACCEPTED | REJECTED
+  reviewedAt DateTime?
+  reviewedById String?
+  reviewedBy   User?   @relation("ProofReviewer", fields: [reviewedById], references: [id])
 
   createdAt DateTime @default(now())
 }
@@ -215,7 +234,101 @@ model Review {
 
   rating    Int
   comment   String?
+  tags      String? // JSON text
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteReview {
+  id String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  rating Int
+  text   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SellerStats {
+  id String @id @default(cuid())
+
+  sellerId String @unique
+  seller   User   @relation(fields: [sellerId], references: [id])
+
+  trustScore            Int   @default(50)
+  completedOrdersCount  Int   @default(0)
+  verifiedProofCount    Int   @default(0)
+  avgRating             Float @default(0)
+  reviewCount           Int   @default(0)
+  disputeCount          Int   @default(0)
+  lastUpdatedAt         DateTime @default(now())
+}
+
+model UserWallet {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  pointsBalance        Int @default(0)
+  creditBalanceCents   Int @default(0)
+  lifetimePointsEarned Int @default(0)
+  lifetimeDiscountBps  Int @default(0)
+}
+
+model PointsLedger {
+  id String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  source     String
+  deltaPoints Int
+  meta       String? // JSON text
+  createdAt  DateTime @default(now())
+}
+
+model CreditLedger {
+  id String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  source     String
+  deltaCents Int
+  meta       String? // JSON text
+  createdAt  DateTime @default(now())
+}
+
+model WheelSpin {
+  id String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  spunAt     DateTime @default(now())
+  rewardType String
+  rewardValue String
+  dayKey String
+
+  @@unique([userId, dayKey])
+}
+
+model UserCoupon {
+  id String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  type String
+  valuePercent Int
+  isUsed Boolean @default(false)
+  createdAt DateTime @default(now())
+  usedAt DateTime?
+  orderIdUsedOn String?
 }
 
 model Dispute {

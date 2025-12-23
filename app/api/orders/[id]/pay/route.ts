@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 function generateSafeTradeCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -62,15 +63,13 @@ export async function POST(
         },
     });
 
-    await prisma.notification.create({
-        data: {
-            userId: order.sellerId,
-            type: "ORDER_STATUS",
-            data: JSON.stringify({
-                orderId: order.id,
-                status: updated.status,
-            }),
-        },
+    await createNotification({
+        userId: order.sellerId,
+        type: "order",
+        title: "Escrow funded",
+        body: "Buyer funded escrow. Ready to deliver.",
+        linkUrl: `/market/orders/${order.id}`,
+        metadata: { orderId: order.id, status: updated.status },
     });
 
     return NextResponse.json({ order: updated });

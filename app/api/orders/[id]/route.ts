@@ -21,7 +21,11 @@ export async function GET(
             listing: { include: { images: true } },
             buyer: true,
             seller: true,
-            deliveryProofs: true,
+            deliveryProofs: {
+                include: {
+                    reviewedBy: { select: { id: true, username: true } },
+                },
+            },
         },
     });
 
@@ -44,7 +48,11 @@ export async function GET(
                 listing: { include: { images: true } },
                 buyer: true,
                 seller: true,
-                deliveryProofs: true,
+                deliveryProofs: {
+                    include: {
+                        reviewedBy: { select: { id: true, username: true } },
+                    },
+                },
             },
         });
     }

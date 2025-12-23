@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { trustBadgeFromScore } from "@/lib/trust-score";
 
 // GET /api/listings
 export async function GET(req: Request) {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     include: {
       category: true,
-      seller: { include: { sellerProfile: true } },
+      seller: { include: { sellerProfile: true, sellerStats: true } },
       images: true,
     },
   });
@@ -55,9 +56,13 @@ export async function GET(req: Request) {
   const payload = listings.map((listing) => {
     const review = reviewBySeller.get(listing.sellerId);
     const trustPercent = review ? Math.round((review.avg / 5) * 100) : 0;
+    const trustScore = listing.seller.sellerStats?.trustScore ?? trustPercent;
+    const trustBadge = trustBadgeFromScore(trustScore);
     return {
       ...listing,
       trustPercent,
+      trustScore,
+      trustBadge,
       reviewCount: review?.count ?? 0,
     };
   });

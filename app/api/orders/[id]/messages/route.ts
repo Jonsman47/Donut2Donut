@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export async function GET(
     req: NextRequest,
@@ -88,6 +89,16 @@ export async function POST(
                 select: { id: true, username: true, image: true },
             },
         },
+    });
+
+    const notifyTarget = order.buyerId === userId ? order.sellerId : order.buyerId;
+    await createNotification({
+        userId: notifyTarget,
+        type: "message",
+        title: "New message",
+        body: content.slice(0, 120),
+        linkUrl: `/market/orders/${order.id}`,
+        metadata: { orderId: order.id, messageId: message.id },
     });
 
     return NextResponse.json({ message });
