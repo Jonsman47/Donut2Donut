@@ -205,9 +205,9 @@ export default function Navbar() {
     {
       key: "account",
       label: "Account",
-      isActive: pathname.startsWith("/dashboard/settings"),
+      isActive: pathname.startsWith("/dashboard/settings") || pathname.startsWith("/profile"),
       items: [
-        { label: "Profile", href: username ? `/seller/${username}` : "/dashboard", show: status === "authenticated" },
+        { label: "Profile", href: username ? `/profile/${username}` : "/dashboard", show: status === "authenticated" },
         { label: "Settings", href: "/dashboard/settings", show: status === "authenticated" },
         { label: "Sign out", action: () => signOut({ callbackUrl: "/" }), show: status === "authenticated" },
       ],
