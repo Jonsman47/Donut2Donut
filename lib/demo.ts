@@ -19,14 +19,15 @@ export type Listing = {
   reviewCount: number;
 
   delivery:
-    | "Instant"
-    | "Manual"
-    | "In-game trade"
-    | "Service"
-    | "Scheduled"
-    | "Milestones";
+  | "Instant"
+  | "Manual"
+  | "In-game trade"
+  | "Service"
+  | "Scheduled"
+  | "Milestones";
 
   escrowOn: boolean;
+  listingType: "ONE_TIME" | "STOCK";
   tags?: string[];
 };
 
@@ -43,6 +44,7 @@ const DEMO_LISTINGS: Listing[] = [
     reviewCount: 41,
     delivery: "Instant",
     escrowOn: true,
+    listingType: "STOCK",
     tags: ["Hot", "Fast"],
   },
   {
@@ -57,6 +59,7 @@ const DEMO_LISTINGS: Listing[] = [
     reviewCount: 19,
     delivery: "Scheduled",
     escrowOn: true,
+    listingType: "STOCK",
     tags: ["Booked"],
   },
   {
@@ -71,6 +74,7 @@ const DEMO_LISTINGS: Listing[] = [
     reviewCount: 63,
     delivery: "Milestones",
     escrowOn: true,
+    listingType: "STOCK",
     tags: ["Pro"],
   },
   {
@@ -85,6 +89,7 @@ const DEMO_LISTINGS: Listing[] = [
     reviewCount: 28,
     delivery: "Instant",
     escrowOn: true,
+    listingType: "STOCK",
     tags: ["Instant"],
   },
 ];
@@ -98,18 +103,18 @@ export async function getListings(): Promise<Listing[]> {
   if (DEMO_MODE) return DEMO_LISTINGS;
 
   const listings = await prisma.listing.findMany({
-    include: { images: true, seller: true, sellerProfile: false },
+    include: { images: true, seller: { include: { sellerProfile: true } } },
     orderBy: { createdAt: "desc" },
   }); // [web:631]
 
   const sellerIds = Array.from(new Set(listings.map((l) => l.sellerId)));
   const reviewStats = sellerIds.length
     ? await prisma.review.groupBy({
-        by: ["toId"],
-        where: { toId: { in: sellerIds } },
-        _avg: { rating: true },
-        _count: { rating: true },
-      })
+      by: ["toId"],
+      where: { toId: { in: sellerIds } },
+      _avg: { rating: true },
+      _count: { rating: true },
+    })
     : [];
   const reviewBySeller = new Map(
     reviewStats.map((stat) => [
@@ -123,7 +128,7 @@ export async function getListings(): Promise<Listing[]> {
     title: l.title,
     imageUrl: l.images[0]?.url ?? getDonutImage(1),
     imageUrls: l.images.map((img) => img.url),
-    priceLabel: `${l.priceCents / 100} €`,
+    priceLabel: `${(l.priceCents / 100).toFixed(2)} €`,
 
     sellerId: l.sellerId,
     sellerName: l.seller.username,
@@ -137,11 +142,12 @@ export async function getListings(): Promise<Listing[]> {
       l.deliveryType === "INGAME_TRADE"
         ? "In-game trade"
         : l.deliveryType === "SERVICE"
-        ? "Service"
-        : l.deliveryType === "MANUAL_DM"
-        ? "Manual"
-        : "Instant",
+          ? "Service"
+          : l.deliveryType === "MANUAL_DM"
+            ? "Manual"
+            : "Instant",
     escrowOn: l.escrowOnly,
+    listingType: (l as any).listingType as "ONE_TIME" | "STOCK",
     tags: [],
   }));
 }
@@ -156,7 +162,7 @@ export async function getListingById(id: string): Promise<Listing | null> {
 
   const l = await prisma.listing.findUnique({
     where: { id },
-    include: { images: true, seller: true },
+    include: { images: true, seller: { include: { sellerProfile: true } } },
   }); // [web:631]
 
   if (!l) return null;
@@ -172,7 +178,7 @@ export async function getListingById(id: string): Promise<Listing | null> {
     title: l.title,
     imageUrl: l.images[0]?.url ?? getDonutImage(1),
     imageUrls: l.images.map((img) => img.url),
-    priceLabel: `${l.priceCents / 100} €`,
+    priceLabel: `${(l.priceCents / 100).toFixed(2)} €`,
 
     sellerId: l.sellerId,
     sellerName: l.seller.username,
@@ -184,11 +190,12 @@ export async function getListingById(id: string): Promise<Listing | null> {
       l.deliveryType === "INGAME_TRADE"
         ? "In-game trade"
         : l.deliveryType === "SERVICE"
-        ? "Service"
-        : l.deliveryType === "MANUAL_DM"
-        ? "Manual"
-        : "Instant",
+          ? "Service"
+          : l.deliveryType === "MANUAL_DM"
+            ? "Manual"
+            : "Instant",
     escrowOn: l.escrowOnly,
+    listingType: (l as any).listingType as "ONE_TIME" | "STOCK",
     tags: [],
   };
 }

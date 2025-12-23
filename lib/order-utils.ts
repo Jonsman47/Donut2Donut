@@ -1,33 +1,30 @@
 export type OrderRole = "buyer" | "seller";
 
 export const ORDER_STATUSES = [
-  "PENDING",
+  "REQUESTED",
   "ACCEPTED",
-  "DECLINED",
-  "PAID",
-  "SHIPPED",
+  "PAID_ESCROW",
   "DELIVERED",
   "COMPLETED",
   "CANCELLED",
-  "DISPUTE",
+  "DISPUTE_OPEN",
 ] as const;
 
 export function getStatusTone(status: string) {
   switch (status) {
-    case "PENDING":
+    case "REQUESTED":
       return "badge badge-warn";
     case "ACCEPTED":
-    case "PAID":
+    case "PAID_ESCROW":
       return "badge badge-blue";
-    case "SHIPPED":
     case "DELIVERED":
       return "badge badge-soft";
     case "COMPLETED":
       return "badge badge-green";
-    case "DECLINED":
     case "CANCELLED":
+    case "REFUNDED":
       return "badge badge-ghost";
-    case "DISPUTE":
+    case "DISPUTE_OPEN":
       return "badge badge-warn";
     default:
       return "badge";
@@ -37,59 +34,35 @@ export function getStatusTone(status: string) {
 export function getNextActionBanner(params: {
   status: string;
   role: OrderRole;
-  deliveryType: string;
 }) {
-  const { status, role, deliveryType } = params;
+  const { status, role } = params;
 
-  if (status === "PENDING") {
+  if (status === "REQUESTED") {
     return role === "seller"
-      ? "Waiting for you to accept or decline this order."
-      : "Waiting for the seller to accept. You can cancel while pending.";
+      ? "New order request! Accept or decline."
+      : "Waiting for the seller to accept your request.";
   }
 
   if (status === "ACCEPTED") {
-    if (role === "seller") {
-      return deliveryType === "SERVICE"
-        ? "Mark delivered when the service is complete."
-        : "Mark as shipped when the delivery is on the way.";
-    }
-    return "Order accepted. Keep an eye on updates from the seller.";
-  }
-
-  if (status === "PAID") {
-    return role === "seller"
-      ? "Payment received. Fulfill the order next."
-      : "Payment confirmed. Waiting on seller fulfillment.";
-  }
-
-  if (status === "SHIPPED") {
     return role === "buyer"
-      ? "Seller marked as shipped. Confirm when received."
-      : "Waiting for buyer confirmation.";
+      ? "Request accepted. Please pay the escrow."
+      : "Waiting for buyer payment.";
   }
 
-  if (status === "DELIVERED") {
-    return role === "buyer"
-      ? "Service marked delivered. Confirm to complete."
-      : "Waiting for buyer confirmation.";
+  if (status === "PAID_ESCROW") {
+    return "Escrow secured. Meet in-game, record/verify, then confirm here.";
   }
 
   if (status === "COMPLETED") {
-    return role === "buyer"
-      ? "Order completed. Leave a review to help the seller."
-      : "Order completed. Thank you for fulfilling it.";
-  }
-
-  if (status === "DECLINED") {
-    return "Order declined. No further action is required.";
+    return "Trade completed successfully.";
   }
 
   if (status === "CANCELLED") {
-    return "Order cancelled. No further action is required.";
+    return "Order cancelled.";
   }
 
-  if (status === "DISPUTE") {
-    return "Dispute opened. Support will review the issue.";
+  if (status === "DISPUTE_OPEN") {
+    return "Dispute open. Support is reviewing.";
   }
 
   return "";

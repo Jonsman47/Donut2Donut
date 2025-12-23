@@ -22,6 +22,7 @@ type Listing = {
   sellerId: string;
   delivery: string;
   escrowOn: boolean;
+  listingType: "ONE_TIME" | "STOCK";
   createdAt?: string;
 };
 
@@ -36,7 +37,7 @@ export default function MarketPage() {
   const { data: session, status } = useSession();
   const userId = (session?.user as any)?.id;
 
-  const [tab, setTab] = useState<"sales" | "buys">("sales");
+  const [tab, setTab] = useState<"sales" | "buys">("buys");
   const [query, setQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | ListingType>("all");
   const [escrowFilter, setEscrowFilter] = useState<"all" | "on" | "off">("all");
@@ -57,6 +58,26 @@ export default function MarketPage() {
 
   const [allListings, setAllListings] = useState<Listing[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
+
+  const [counts, setCounts] = useState<{
+    pendingSales: number;
+    activeOrders: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    async function fetchCounts() {
+      try {
+        const res = await fetch(`/api/unread-counts?t=${Date.now()}`);
+        if (res.ok) setCounts(await res.json());
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 5000);
+    return () => clearInterval(interval);
+  }, [status]);
 
   useEffect(() => {
     async function loadListings() {
@@ -79,6 +100,7 @@ export default function MarketPage() {
           sellerId: l.seller?.id ?? "",
           delivery: l.deliveryType === "SERVICE" ? "Service" : "In-game trade",
           escrowOn: l.escrowOnly ?? true,
+          listingType: l.listingType ?? "STOCK",
           createdAt: l.createdAt,
         }));
 
@@ -95,6 +117,7 @@ export default function MarketPage() {
 
   function resetForm() {
     setEditingId(null);
+    setIsOneTime(true);
     setTitle("");
     setDescription("");
     setQuantity(1);
@@ -122,6 +145,8 @@ export default function MarketPage() {
     };
     reader.readAsDataURL(file);
   }
+
+  const [isOneTime, setIsOneTime] = useState(true);
 
   async function handleCreateOrUpdateListing() {
     setError(null);
@@ -172,16 +197,16 @@ export default function MarketPage() {
           prev.map((l) =>
             l.id === editingId
               ? {
-                  ...l,
-                  title: data.listing.title,
-                  description: data.listing.description,
-                  priceLabel: (data.listing.priceCents / 100).toFixed(2) + " €",
-                  imageUrl: data.listing.images?.[0]?.url ?? coverUrl,
-                  type: data.listing.deliveryType === "SERVICE" ? "service" : "item",
-                  quantity: data.listing.stock ?? undefined,
-                  delivery: data.listing.deliveryType === "SERVICE" ? "Service" : "In-game trade",
-                  escrowOn: data.listing.escrowOnly ?? true,
-                }
+                ...l,
+                title: data.listing.title,
+                description: data.listing.description,
+                priceLabel: (data.listing.priceCents / 100).toFixed(2) + " €",
+                imageUrl: data.listing.images?.[0]?.url ?? coverUrl,
+                type: data.listing.deliveryType === "SERVICE" ? "service" : "item",
+                quantity: data.listing.stock ?? undefined,
+                delivery: data.listing.deliveryType === "SERVICE" ? "Service" : "In-game trade",
+                escrowOn: data.listing.escrowOnly ?? true,
+              }
               : l
           )
         );
@@ -207,6 +232,7 @@ export default function MarketPage() {
           stock: listingType === "item" ? quantity : null,
           deliveryType: listingType === "item" ? "INGAME_TRADE" : "SERVICE",
           imageUrl: coverUrl,
+          listingType: isOneTime ? "ONE_TIME" : "STOCK",
         }),
       });
 
@@ -234,6 +260,7 @@ export default function MarketPage() {
           sellerId: userId ?? "",
           delivery: listingType === "service" ? "Service" : "In-game trade",
           escrowOn: true,
+          listingType: isOneTime ? "ONE_TIME" : "STOCK",
           createdAt: data.listing.createdAt ?? new Date().toISOString(),
         },
         ...prev,
@@ -274,7 +301,7 @@ export default function MarketPage() {
   }
 
   async function handleDelete(listingId: string) {
-    const ok = confirm("Tu es sûr de vouloir supprimer cette annonce ?");
+    const ok = confirm("Are you sure you want to delete this listing?");
     if (!ok) return;
 
     try {
@@ -282,7 +309,7 @@ export default function MarketPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert((data as any).error || "Erreur lors de la suppression de l'annonce.");
+        alert((data as any).error || "Error deleting listing.");
         return;
       }
 
@@ -382,15 +409,23 @@ export default function MarketPage() {
               type="button"
               className={tab === "sales" ? "btn btn-primary" : "btn btn-ghost"}
               onClick={() => setTab("sales")}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
             >
-              My listings
+              My listings (Sales)
+              {!!counts?.pendingSales && counts.pendingSales > 0 && (
+                <span className="badge badge-warn">{counts.pendingSales}</span>
+              )}
             </button>
             <button
               type="button"
               className={tab === "buys" ? "btn btn-primary" : "btn btn-ghost"}
               onClick={() => setTab("buys")}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
             >
-              Available listings
+              Available listings (Orders)
+              {!!counts?.activeOrders && counts.activeOrders > 0 && (
+                <span className="badge badge-warn">{counts.activeOrders}</span>
+              )}
             </button>
           </div>
 
@@ -431,6 +466,31 @@ export default function MarketPage() {
                     >
                       Service
                     </button>
+                  </div>
+
+                  <div className="stack-6">
+                    <label className="muted">Listing persistence</label>
+                    <div style={{ display: "flex", gap: 12 }}>
+                      <button
+                        type="button"
+                        className={isOneTime ? "btn btn-soft" : "btn btn-ghost"}
+                        onClick={() => setIsOneTime(true)}
+                      >
+                        🔂 One-Time Sale
+                      </button>
+                      <button
+                        type="button"
+                        className={!isOneTime ? "btn btn-soft" : "btn btn-ghost"}
+                        onClick={() => setIsOneTime(false)}
+                      >
+                        📦 Infinite Stock
+                      </button>
+                    </div>
+                    <p className="text-sm muted">
+                      {isOneTime
+                        ? "Listing will be automatically removed after the trade is completed."
+                        : "Listing stays active for multiple buyers."}
+                    </p>
                   </div>
 
                   <div className="stack-6">
@@ -495,23 +555,6 @@ export default function MarketPage() {
 
                   <div className="stack-6">
                     <span className="muted">Cover image</span>
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      {gallery.map((img) => (
-                        <button
-                          key={img}
-                          type="button"
-                          onClick={() => {
-                            setCustomImageUrl("");
-                            setCoverUrl(img);
-                          }}
-                          className={coverUrl === img ? "btn btn-soft" : "btn btn-ghost"}
-                          style={{ padding: "6px 10px" }}
-                        >
-                          <span className="badge badge-blue">Select</span>
-                          <span>{img.replace("/", "")}</span>
-                        </button>
-                      ))}
-                    </div>
 
                     <div className="grid-2">
                       <div className="stack-6">
@@ -618,9 +661,7 @@ export default function MarketPage() {
                     reviewCount={listing.reviewCount}
                     delivery={listing.delivery}
                     escrowOn={listing.escrowOn}
-                    messageHref={`/market/messages?listingId=${listing.id}&prefill=${encodeURIComponent(
-                      `Hi, I’m interested in ${listing.title}. Is it still available?`
-                    )}`}
+                    listingType={listing.listingType}
                   />
 
                   {tab === "sales" && listing.sellerId === userId && (

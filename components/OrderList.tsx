@@ -10,6 +10,7 @@ type OrderListItem = {
   id: string;
   status: string;
   createdAt: string;
+  updatedAt: string;
   quantity: number;
   totalCents: number;
   buyer: { username: string; image?: string | null };
@@ -21,6 +22,33 @@ type OrderListItem = {
   unreadMessages: number;
   conversationId: string | null;
 };
+
+function Countdown({ updatedAt }: { updatedAt: string }) {
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    const deadline = new Date(updatedAt).getTime() + 24 * 60 * 60 * 1000;
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const diff = deadline - now;
+
+      if (diff <= 0) {
+        setTimeLeft("Expired");
+        clearInterval(timer);
+      } else {
+        const h = Math.floor(diff / (1000 * 60 * 60));
+        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft(`${h}h ${m}m ${s}s`);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [updatedAt]);
+
+  return <span className="badge badge-warn">Deleted in: {timeLeft}</span>;
+}
 
 export default function OrderList({ role }: { role: OrderListRole }) {
   const [orders, setOrders] = useState<OrderListItem[]>([]);
@@ -45,8 +73,10 @@ export default function OrderList({ role }: { role: OrderListRole }) {
       }
     }
     load();
+    const interval = setInterval(load, 5000);
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, [role]);
 
@@ -98,14 +128,12 @@ export default function OrderList({ role }: { role: OrderListRole }) {
                   {role === "buyer" ? "Seller" : "Buyer"}: {otherParty.username}
                 </div>
                 <div className="muted" style={{ fontSize: "0.8rem" }}>
-                  {formatDate(order.createdAt)}
+                  {order.status === "DECLINED" ? (
+                    <Countdown updatedAt={order.updatedAt} />
+                  ) : (
+                    formatDate(order.createdAt)
+                  )}
                 </div>
-                {order.unreadMessages > 0 && (
-                  <span className="badge badge-warn" style={{ width: "fit-content" }}>
-                    {order.unreadMessages} unread message
-                    {order.unreadMessages > 1 ? "s" : ""}
-                  </span>
-                )}
               </div>
             </div>
           </Link>
