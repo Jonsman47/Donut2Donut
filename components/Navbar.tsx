@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import ThemeToggle from "./ThemeToggle";
 
 const UNREAD_POLL_INTERVAL = 5000;
 const NOTIFICATIONS_PREVIEW_LIMIT = 6;
+const NAV_OPEN_DELAY = 75;
+const NAV_CLOSE_DELAY = 150;
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -22,6 +24,8 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [verifyStatus, setVerifyStatus] = useState<{ setupComplete: boolean } | null>(null);
+  const openTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const username = useMemo(() => {
     const user = session?.user as any;
@@ -81,6 +85,17 @@ export default function Navbar() {
   }, [pathname]);
 
   useEffect(() => {
+    return () => {
+      if (openTimeoutRef.current) {
+        clearTimeout(openTimeoutRef.current);
+      }
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (status !== "authenticated") {
       setVerifyStatus(null);
       return;
@@ -103,6 +118,36 @@ export default function Navbar() {
   }, [status]);
 
   const showGetStarted = status === "authenticated" && verifyStatus && !verifyStatus.setupComplete;
+
+  const clearOpenTimeout = () => {
+    if (openTimeoutRef.current) {
+      clearTimeout(openTimeoutRef.current);
+      openTimeoutRef.current = null;
+    }
+  };
+
+  const clearCloseTimeout = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleOpenMenu = (menuKey: string) => {
+    clearCloseTimeout();
+    clearOpenTimeout();
+    openTimeoutRef.current = setTimeout(() => {
+      setOpenMenu(menuKey);
+    }, NAV_OPEN_DELAY);
+  };
+
+  const scheduleCloseMenu = () => {
+    clearOpenTimeout();
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => {
+      setOpenMenu(null);
+    }, NAV_CLOSE_DELAY);
+  };
 
   const navSections = [
     {
@@ -173,12 +218,17 @@ export default function Navbar() {
               <div
                 key={section.key}
                 className={`nav-item${section.isActive ? " active" : ""}${openMenu === section.key ? " open" : ""}`}
-                onMouseLeave={() => setOpenMenu(null)}
+                onMouseEnter={() => scheduleOpenMenu(section.key)}
+                onMouseLeave={scheduleCloseMenu}
               >
                 <button
                   className="nav-trigger"
                   type="button"
-                  onClick={() => setOpenMenu((prev) => (prev === section.key ? null : section.key))}
+                  onClick={() => {
+                    clearOpenTimeout();
+                    clearCloseTimeout();
+                    setOpenMenu((prev) => (prev === section.key ? null : section.key));
+                  }}
                 >
                   {section.label}
                 </button>
