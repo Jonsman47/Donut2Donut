@@ -15,6 +15,9 @@ const ACTION_LABELS: Record<string, string> = {
   DISPUTE: "Open dispute",
 };
 
+const MIN_REVIEW_LENGTH = 10;
+const MAX_REVIEW_LENGTH = 500;
+
 type OrderDetail = {
   id: string;
   status: string;
@@ -123,11 +126,24 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
   async function handleSubmitReview() {
     if (!order) return;
     setReviewState(null);
+    const trimmedComment = comment.trim();
+    if (!rating || rating < 1 || rating > 5) {
+      setReviewState("Choose a rating between 1 and 5.");
+      return;
+    }
+    if (trimmedComment.length < MIN_REVIEW_LENGTH) {
+      setReviewState(`Review must be at least ${MIN_REVIEW_LENGTH} characters.`);
+      return;
+    }
+    if (trimmedComment.length > MAX_REVIEW_LENGTH) {
+      setReviewState(`Review must be under ${MAX_REVIEW_LENGTH} characters.`);
+      return;
+    }
     try {
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: order.id, rating, comment, tags }),
+        body: JSON.stringify({ orderId: order.id, rating, comment: trimmedComment, tags }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -238,7 +254,11 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
                   placeholder="Share feedback for the seller"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
+                  maxLength={MAX_REVIEW_LENGTH}
                 />
+                <div className="small muted">
+                  {comment.trim().length}/{MAX_REVIEW_LENGTH} characters (min {MIN_REVIEW_LENGTH})
+                </div>
                 <input
                   className="input"
                   placeholder="Optional tags (comma separated)"

@@ -19,8 +19,8 @@ export async function GET(
         where: { id: orderId },
         include: {
             listing: { include: { images: true } },
-            buyer: true,
-            seller: true,
+            buyer: { select: { id: true, username: true, image: true } },
+            seller: { select: { id: true, username: true, image: true } },
             deliveryProofs: {
                 include: {
                     reviewedBy: { select: { id: true, username: true } },
@@ -46,8 +46,8 @@ export async function GET(
             },
             include: {
                 listing: { include: { images: true } },
-                buyer: true,
-                seller: true,
+                buyer: { select: { id: true, username: true, image: true } },
+                seller: { select: { id: true, username: true, image: true } },
                 deliveryProofs: {
                     include: {
                         reviewedBy: { select: { id: true, username: true } },

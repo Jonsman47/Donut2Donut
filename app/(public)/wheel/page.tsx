@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { signIn, useSession } from "next-auth/react";
 
 const REWARD_LABELS: Record<string, string> = {
   points: "Points",
@@ -10,38 +11,50 @@ const REWARD_LABELS: Record<string, string> = {
 };
 
 export default function WheelPage() {
+  const { status } = useSession();
   const [canSpin, setCanSpin] = useState(false);
-  const [status, setStatus] = useState<string>("Checking...");
+  const [spinStatus, setSpinStatus] = useState<string>("Checking...");
   const [spinning, setSpinning] = useState(false);
   const [reward, setReward] = useState<any>(null);
 
   async function loadStatus() {
-    const res = await fetch("/api/wheel");
+    const res = await fetch("/api/wheel", { credentials: "include" });
     if (!res.ok) {
-      setStatus("Sign in to spin.");
+      setSpinStatus("Sign in to spin.");
       return;
     }
     const data = await res.json();
     setCanSpin(data.canSpin);
-    setStatus(data.canSpin ? "Free spin available" : "Next spin tomorrow");
+    setSpinStatus(data.canSpin ? "Free spin available" : "Next spin tomorrow");
   }
 
   useEffect(() => {
-    loadStatus();
-  }, []);
+    if (status === "authenticated") {
+      loadStatus();
+      return;
+    }
+    if (status === "unauthenticated") {
+      setCanSpin(false);
+      setSpinStatus("Sign in to spin.");
+    }
+  }, [status]);
 
   async function spin() {
+    if (status !== "authenticated") {
+      setSpinStatus("Sign in to spin.");
+      return;
+    }
     setSpinning(true);
     setReward(null);
-    const res = await fetch("/api/wheel", { method: "POST" });
+    const res = await fetch("/api/wheel", { method: "POST", credentials: "include" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setStatus(data.error || "Unable to spin");
+      setSpinStatus(data.error || "Unable to spin");
       setSpinning(false);
       return;
     }
     setReward(data.reward);
-    setStatus("Spin complete!");
+    setSpinStatus("Spin complete!");
     setCanSpin(false);
     setSpinning(false);
   }
@@ -67,7 +80,7 @@ export default function WheelPage() {
         >
           <div className="stack-10">
             <div className="badge badge-blue" style={{ alignSelf: "center" }}>
-              {status}
+              {spinStatus}
             </div>
             <div
               style={{
@@ -90,6 +103,15 @@ export default function WheelPage() {
             >
               {spinning ? "Spinning..." : "Spin the wheel"}
             </button>
+            {status === "unauthenticated" && (
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => signIn(undefined, { callbackUrl: "/wheel" })}
+              >
+                Sign in to spin
+              </button>
+            )}
             {reward && (
               <div className="surface" style={{ padding: 16, borderRadius: 16 }}>
                 <strong>You won:</strong> {REWARD_LABELS[reward.type]}

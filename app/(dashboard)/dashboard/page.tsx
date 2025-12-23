@@ -8,7 +8,11 @@ export default async function Dashboard() {
   const uid = (session as any)?.uid as string | undefined;
   if (!uid) return <div className="card">Login first.</div>;
 
-  const user = await db.user.findUnique({ where: { id: uid }, include: { sellerProfile: true } });
+  const user = await db.user.findUnique({
+    where: { id: uid },
+    select: { sellerProfile: true, setupCompletedAt: true, tosAcceptedAt: true },
+  });
+  const setupBlocked = !user?.setupCompletedAt || !user?.tosAcceptedAt;
 
   return (
     <div style={{display:"grid", gap:12}}>
@@ -23,6 +27,16 @@ export default async function Dashboard() {
           <Link className="btn2" href="/dashboard/settings">Settings</Link>
         </div>
       </div>
+
+      {setupBlocked && (
+        <div className="card">
+          <b>Finish setup to sell</b>
+          <div className="small">Complete verification before creating listings.</div>
+          <div style={{ marginTop: 10 }}>
+            <Link className="btn2" href="/verify">Finish setup</Link>
+          </div>
+        </div>
+      )}
 
       {!user?.sellerProfile ? (
         <div className="card">

@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     include: {
       category: true,
-      seller: { include: { sellerProfile: true, sellerStats: true } },
+      seller: { select: { id: true, username: true, image: true, sellerProfile: true, sellerStats: true } },
       images: true,
     },
   });
@@ -84,6 +84,21 @@ export async function POST(req: Request) {
     }
 
     const sellerId = (session.user as any).id as string;
+
+    const setup = await prisma.user.findUnique({
+      where: { id: sellerId },
+      select: { setupCompletedAt: true, tosAcceptedAt: true },
+    });
+
+    if (!setup?.setupCompletedAt || !setup?.tosAcceptedAt) {
+      return NextResponse.json(
+        {
+          error: "Finish setup before selling",
+          link: "/verify",
+        },
+        { status: 403 }
+      );
+    }
 
     // 2) Lire le body envoyé par le client
     const body = await req.json();
@@ -142,7 +157,7 @@ export async function POST(req: Request) {
       },
       include: {
         category: true,
-        seller: { include: { sellerProfile: true } },
+        seller: { select: { id: true, username: true, image: true, sellerProfile: true } },
         images: true,
       },
     });

@@ -1,9 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 export default function SellerPage() {
+  const { status } = useSession();
+  const [setupComplete, setSetupComplete] = useState(true);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let active = true;
+    async function loadStatus() {
+      try {
+        const res = await fetch("/api/verify/status");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) setSetupComplete(Boolean(data.setupComplete));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadStatus();
+    return () => {
+      active = false;
+    };
+  }, [status]);
+
+  const setupBlocked = status === "authenticated" && !setupComplete;
+
   return (
     <div className="seller">
       {/* HEADER */}
@@ -19,11 +44,29 @@ export default function SellerPage() {
           <Link className="btn btn-soft" href="/market">
             See Market
           </Link>
-          <Link className="btn btn-primary" href="/seller/new">
-            New Listing
-          </Link>
+          {setupBlocked ? (
+            <Link className="btn btn-secondary" href="/verify">
+              Finish setup
+            </Link>
+          ) : (
+            <Link className="btn btn-primary" href="/seller/new">
+              New Listing
+            </Link>
+          )}
         </div>
       </section>
+
+      {setupBlocked && (
+        <section className="strip">
+          <div className="strip-card" style={{ gridColumn: "1 / -1" }}>
+            <div className="k">Finish setup to sell</div>
+            <div className="v">Complete verification before listing</div>
+            <div className="m">
+              You need to finish profile setup and accept the TOS before selling.
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* INFO STRIP */}
       <section className="strip">

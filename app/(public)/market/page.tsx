@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import ListingCard from "@/components/ListingCard";
 import { getDonutGallery, getDonutImage } from "@/lib/donut-images";
@@ -64,6 +65,12 @@ export default function MarketPage() {
     pendingSales: number;
     activeOrders: number;
   } | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<{
+    setupComplete: boolean;
+    profileComplete: boolean;
+    tosAccepted: boolean;
+    discordConnected: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -78,6 +85,35 @@ export default function MarketPage() {
     fetchCounts();
     const interval = setInterval(fetchCounts, 5000);
     return () => clearInterval(interval);
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setVerifyStatus(null);
+      return;
+    }
+    let active = true;
+    async function loadVerifyStatus() {
+      try {
+        const res = await fetch("/api/verify/status");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) {
+          setVerifyStatus({
+            setupComplete: Boolean(data.setupComplete),
+            profileComplete: Boolean(data.profileComplete),
+            tosAccepted: Boolean(data.tosAccepted),
+            discordConnected: Boolean(data.discordConnected),
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadVerifyStatus();
+    return () => {
+      active = false;
+    };
   }, [status]);
 
   useEffect(() => {
@@ -153,6 +189,10 @@ export default function MarketPage() {
   async function handleCreateOrUpdateListing() {
     setError(null);
 
+    if (verifyStatus && !verifyStatus.setupComplete) {
+      setError("Finish setup to sell. Visit /verify to complete your profile.");
+      return;
+    }
     if (!title.trim()) {
       setError("Title is required.");
       return;
@@ -349,6 +389,8 @@ export default function MarketPage() {
       return 0;
     });
 
+  const setupBlocked = status === "authenticated" && verifyStatus && !verifyStatus.setupComplete;
+
   return (
     <div>
       <section className="container section">
@@ -445,6 +487,20 @@ export default function MarketPage() {
                   {status === "unauthenticated" && (
                     <div className="badge badge-warn" style={{ width: "fit-content" }}>
                       Sign in to create listings.
+                    </div>
+                  )}
+
+                  {setupBlocked && (
+                    <div className="surface surface-strong" style={{ padding: 12, borderRadius: 12 }}>
+                      <div className="stack-4">
+                        <strong>Finish setup to sell</strong>
+                        <div className="muted">
+                          Complete your verification checklist before creating listings.
+                        </div>
+                        <Link className="btn btn-secondary" href="/verify">
+                          Finish setup
+                        </Link>
+                      </div>
                     </div>
                   )}
 
@@ -592,7 +648,7 @@ export default function MarketPage() {
                       className="btn btn-primary"
                       type="button"
                       onClick={handleCreateOrUpdateListing}
-                      disabled={status !== "authenticated"}
+                      disabled={status !== "authenticated" || setupBlocked}
                     >
                       {editingId ? "Save changes" : "Create listing"}
                     </button>
