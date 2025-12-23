@@ -127,9 +127,15 @@ export default function SellerPage() {
           <div className="divider" />
 
           <div className="ctaRow">
-            <Link className="btn btn-primary" href="/seller/new">
-              Create listing
-            </Link>
+            {setupBlocked ? (
+              <Link className="btn btn-secondary" href="/verify">
+                Finish setup
+              </Link>
+            ) : (
+              <Link className="btn btn-primary" href="/seller/new">
+                Create listing
+              </Link>
+            )}
             <Link className="btn btn-ghost" href="/rules">
               Read rules
             </Link>

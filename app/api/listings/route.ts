@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { trustBadgeFromScore } from "@/lib/trust-score";
+import { getVerificationStatus } from "@/lib/verification";
 
 // GET /api/listings
 export async function GET(req: Request) {
@@ -85,12 +86,9 @@ export async function POST(req: Request) {
 
     const sellerId = (session.user as any).id as string;
 
-    const setup = await prisma.user.findUnique({
-      where: { id: sellerId },
-      select: { setupCompletedAt: true, tosAcceptedAt: true },
-    });
+    const verification = await getVerificationStatus(sellerId);
 
-    if (!setup?.setupCompletedAt || !setup?.tosAcceptedAt) {
+    if (!verification?.setupComplete) {
       return NextResponse.json(
         {
           error: "Finish setup before selling",

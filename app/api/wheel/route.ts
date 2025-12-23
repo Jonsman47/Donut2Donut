@@ -33,15 +33,15 @@ function getDayKey(date = new Date()) {
 
 export async function GET() {
   const session = await getServerSession(authOptions);
+  const userId = (session as any)?.uid ?? (session?.user as any)?.id ?? null;
   console.log("[WHEEL][GET] session", {
-    userId: session?.user?.id ?? null,
-    hasSession: Boolean(session),
+    userId,
+    hasSession: Boolean(userId),
   });
-  if (!session || !session.user?.id) {
+  if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const userId = session.user.id as string;
   const dayKey = getDayKey();
 
   const latestSpin = await prisma.wheelSpin.findFirst({
@@ -57,15 +57,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
+  const userId = (session as any)?.uid ?? (session?.user as any)?.id ?? null;
   console.log("[WHEEL][POST] session", {
-    userId: session?.user?.id ?? null,
-    hasSession: Boolean(session),
+    userId,
+    hasSession: Boolean(userId),
   });
-  if (!session || !session.user?.id) {
+  if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const userId = session.user.id as string;
   const dayKey = getDayKey();
 
   const existing = await prisma.wheelSpin.findUnique({

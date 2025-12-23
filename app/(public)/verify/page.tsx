@@ -78,20 +78,62 @@ export default function VerifyPage() {
 
         {status === "authenticated" && verifyStatus && (
           <div className="stack-12">
+            <div
+              className="surface"
+              style={{
+                padding: 18,
+                borderRadius: 18,
+                display: "grid",
+                gap: 10,
+              }}
+            >
+              <div className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                Stepper
+              </div>
+              <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+                {[
+                  { label: "Connect Discord", done: verifyStatus.discordConnected },
+                  { label: "Complete profile", done: verifyStatus.profileComplete },
+                  { label: "Accept TOS", done: verifyStatus.tosAccepted },
+                  { label: "Ready to sell", done: verifyStatus.setupComplete },
+                ].map((step) => (
+                  <div
+                    key={step.label}
+                    className="surface"
+                    style={{
+                      padding: 12,
+                      borderRadius: 14,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                    }}
+                  >
+                    <span className="muted">{step.label}</span>
+                    <span>{step.done ? "✅" : "⬜️"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="grid-2" style={{ gap: 12 }}>
               <div className="surface" style={{ padding: 18, borderRadius: 18 }}>
                 <div className="stack-6">
-                  <strong>Step 1 · Connect Discord</strong>
+                  <strong>Discord</strong>
                   <div className="muted">
                     Status: {verifyStatus.discordConnected ? "✅ Connected" : "❌ Not connected"}
                   </div>
-                  {!verifyStatus.discordConnected && (
+                  {!verifyStatus.discordConnected ? (
                     <button
                       className="btn btn-primary"
                       type="button"
                       onClick={() => signIn("discord", { callbackUrl: "/verify" })}
                     >
-                      Connect Discord
+                      Connect
+                    </button>
+                  ) : (
+                    <button className="btn btn-secondary" type="button" disabled>
+                      Connected
                     </button>
                   )}
                 </div>
@@ -99,29 +141,35 @@ export default function VerifyPage() {
 
               <div className="surface" style={{ padding: 18, borderRadius: 18 }}>
                 <div className="stack-6">
-                  <strong>Step 2 · Complete profile</strong>
+                  <strong>Profile setup</strong>
                   <div className="muted">
                     Status: {verifyStatus.profileComplete ? "✅ Complete" : "❌ Incomplete"}
                   </div>
                   <div className="muted">Email, Minecraft username, and real name.</div>
+                  <Link className="btn btn-secondary" href="/verify/setup">
+                    Edit setup
+                  </Link>
                 </div>
               </div>
 
               <div className="surface" style={{ padding: 18, borderRadius: 18 }}>
                 <div className="stack-6">
-                  <strong>Step 3 · Accept TOS</strong>
+                  <strong>Terms of Service</strong>
                   <div className="muted">
                     Status: {verifyStatus.tosAccepted ? "✅ Accepted" : "❌ Not accepted"}
                   </div>
                   <div className="muted">Required before you can sell.</div>
+                  <Link className="btn btn-secondary" href="/tos">
+                    Read TOS
+                  </Link>
                 </div>
               </div>
 
               <div className="surface" style={{ padding: 18, borderRadius: 18 }}>
                 <div className="stack-6">
-                  <strong>Step 4 · Ready to sell</strong>
+                  <strong>Ready to sell</strong>
                   <div className="muted">
-                    {verifyStatus.setupComplete ? "✅ All set!" : "⏳ Finish setup to unlock selling."}
+                    {verifyStatus.setupComplete ? "✅ You can sell" : "❌ You cannot sell yet"}
                   </div>
                 </div>
               </div>
@@ -149,9 +197,9 @@ export default function VerifyPage() {
                   {verifyStatus.profileComplete ? "Complete" : "Incomplete"} · TOS:{" "}
                   {verifyStatus.tosAccepted ? "Accepted" : "Pending"}
                 </div>
-                <Link className="btn btn-ghost" href="/verify/setup">
-                  Edit setup
-                </Link>
+                <div className="muted">
+                  {verifyStatus.setupComplete ? "✅ You can sell" : "❌ You cannot sell yet"}
+                </div>
               </div>
             </div>
           </div>

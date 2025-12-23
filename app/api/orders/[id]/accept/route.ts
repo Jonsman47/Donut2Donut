@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
+import { getVerificationStatus } from "@/lib/verification";
 
 export async function POST(
     req: NextRequest,
@@ -27,6 +28,14 @@ export async function POST(
     if (order.sellerId !== userId) {
         return NextResponse.json(
             { error: "Only the seller can accept." },
+            { status: 403 }
+        );
+    }
+
+    const verification = await getVerificationStatus(userId);
+    if (!verification?.setupComplete) {
+        return NextResponse.json(
+            { error: "Finish setup before selling", link: "/verify" },
             { status: 403 }
         );
     }

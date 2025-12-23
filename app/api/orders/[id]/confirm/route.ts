@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
 import { refreshSellerStats } from "@/lib/seller-stats";
+import { getVerificationStatus } from "@/lib/verification";
 
 export async function POST(
     req: NextRequest,
@@ -52,6 +53,13 @@ export async function POST(
         if (order.buyerId === userId) {
             dataToUpdate.buyerConfirmedAt = new Date();
         } else if (order.sellerId === userId) {
+            const verification = await getVerificationStatus(userId);
+            if (!verification?.setupComplete) {
+                return NextResponse.json(
+                    { error: "Finish setup before selling", link: "/verify" },
+                    { status: 403 }
+                );
+            }
             dataToUpdate.sellerConfirmedAt = new Date();
         } else {
             return NextResponse.json({ error: "Access denied" }, { status: 403 });
