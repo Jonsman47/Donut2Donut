@@ -53,7 +53,7 @@ export default function Navbar() {
   }, [status]);
 
   return (
-    <header className="site-header">
+    <header className="site-header" style={{ animation: 'fadeDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
       <div className="container site-nav">
         <Link href="/" className="stack-4" style={{ minWidth: 160 }}>
           <span style={{ fontWeight: 700, letterSpacing: "-0.01em" }}>
