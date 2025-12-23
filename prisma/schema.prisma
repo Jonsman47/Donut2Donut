@@ -17,14 +17,12 @@ model User {
   role          String    @default("USER") // USER | SELLER | MOD | ADMIN
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  balanceCents  Int       @default(0)
 
   sellerProfile  SellerProfile?
   listings       Listing[]
   ordersBuy      Order[]        @relation("BuyerOrders")
   ordersSell     Order[]        @relation("SellerOrders")
-  conversationsAsBuyer Conversation[] @relation("BuyerConversations")
-  conversationsAsSeller Conversation[] @relation("SellerConversations")
-  messages       Message[]
   notifications  Notification[]
   reviewsGiven   Review[]       @relation("ReviewsGiven")
   reviewsGot     Review[]       @relation("ReviewsGot")
@@ -32,6 +30,8 @@ model User {
   reportsAgainst Report[]       @relation("ReportsAgainst")
   disputesOpened Dispute[]      @relation("DisputesOpened")
   trustEvents    TrustEvent[]
+  tradeMessages  TradeMessage[]
+  deliveryProofs DeliveryProof[]
 
 }
 
@@ -93,6 +93,7 @@ model Listing {
   priceCents  Int
   currency    String @default("EUR")
   stock       Int? // null = made to order/unlimited
+  listingType String @default("STOCK") // ONE_TIME | STOCK
 
   deliveryType String // INSTANT_CODE | MANUAL_DM | INGAME_TRADE | SERVICE
   escrowOnly   Boolean @default(true)
@@ -100,7 +101,6 @@ model Listing {
   proofPolicy ProofPolicy?
   images      ListingImage[]
   orders      Order[]
-  conversations Conversation[]
 
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -142,15 +142,14 @@ model Order {
   quantity         Int @default(1)
   unitPriceCents   Int
   subtotalCents    Int
-  platformFeeCents Int
+  platformFeeCents Int @default(0)
   totalCents       Int
 
-  status String @default("PAID")
-  // PAID | AWAITING_SELLER_ACCEPT | AWAITING_DELIVERY | DELIVERED | CONFIRMED
-  // DISPUTE_OPEN | DISPUTE_REVIEW | REFUNDED | PARTIAL_REFUND | RELEASED_TO_SELLER | CANCELLED
+  status String @default("REQUESTED")
+  // REQUESTED | ACCEPTED | AWAITING_PAYMENT | PAID_ESCROW | DELIVERED | DISPUTE_OPEN | COMPLETED | CANCELLED | REFUNDED
 
-  safeTradeCode        String
-  buyerDisputeDeadline DateTime
+  safeTradeCode        String?
+  buyerDisputeDeadline DateTime?
 
   scheduleAt       DateTime?
   scheduleTimezone String?
@@ -161,49 +160,16 @@ model Order {
   escrowFundedAt        DateTime?
   releasedAt            DateTime?
 
+  buyerConfirmedAt      DateTime?
+  sellerConfirmedAt     DateTime?
+
   deliveryProofs DeliveryProof[]
   disputes       Dispute[]
   review         Review?
+  tradeMessages  TradeMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model Conversation {
-  id String @id @default(cuid())
-
-  listingId String?
-  listing   Listing? @relation(fields: [listingId], references: [id])
-
-  buyerId String
-  buyer   User @relation("BuyerConversations", fields: [buyerId], references: [id])
-
-  sellerId String
-  seller   User @relation("SellerConversations", fields: [sellerId], references: [id])
-
-  lastMessageAt DateTime?
-
-  messages Message[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([listingId, buyerId, sellerId])
-}
-
-model Message {
-  id String @id @default(cuid())
-
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-
-  senderId String
-  sender   User @relation(fields: [senderId], references: [id])
-
-  body   String
-  readAt DateTime?
-
-  createdAt DateTime @default(now())
 }
 
 model Notification {
@@ -223,6 +189,9 @@ model DeliveryProof {
   id      String @id @default(cuid())
   orderId String
   order   Order  @relation(fields: [orderId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   kind String // screenshot | video | file | message | code_log
   url  String
@@ -305,5 +274,18 @@ model TrustEvent {
   delta     Int
   reason    String
   meta      String? // JSON text
+  createdAt DateTime @default(now())
+}
+
+model TradeMessage {
+  id String @id @default(cuid())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id])
+
+  content   String
   createdAt DateTime @default(now())
 }

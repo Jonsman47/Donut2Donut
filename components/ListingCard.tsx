@@ -14,6 +14,7 @@ type Props = {
   reviewCount?: number;
   delivery?: string;
   escrowOn?: boolean;
+  listingType?: "ONE_TIME" | "STOCK";
   messageHref?: string;
 };
 
@@ -28,14 +29,15 @@ export default function ListingCard({
   reviewCount = 0,
   delivery = "Instant",
   escrowOn = true,
+  listingType = "STOCK",
   messageHref,
 }: Props) {
   const trustTone =
     trustPercent >= 85
       ? "badge-good"
       : trustPercent >= 65
-      ? "badge-blue"
-      : "badge-warn";
+        ? "badge-blue"
+        : "badge-warn";
 
   return (
     <div className="stack-6">
@@ -71,6 +73,9 @@ export default function ListingCard({
             ) : (
               <span className="badge badge-warn">No escrow</span>
             )}
+            <span className={`badge ${listingType === "ONE_TIME" ? "badge-warn" : "badge-blue"}`}>
+              {listingType === "ONE_TIME" ? "One-time Sale" : "Unlimited Stock"}
+            </span>
           </div>
         </div>
 

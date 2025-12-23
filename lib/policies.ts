@@ -1,4 +1,4 @@
-export const PLATFORM_FEE_BPS = 267; // 2.67%
+export const PLATFORM_FEE_BPS = 1000; // 10%
 
 export function platformFeeCents(subtotalCents: number) {
   return Math.round((subtotalCents * PLATFORM_FEE_BPS) / 10000);

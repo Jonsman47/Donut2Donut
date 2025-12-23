@@ -87,6 +87,9 @@ export default async function ListingPage({ params }: PageProps) {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <span className="badge badge-good">Escrow on</span>
                   <span className="badge">Delivery: {listing.delivery}</span>
+                  <span className={`badge ${listing.listingType === "ONE_TIME" ? "badge-warn" : "badge-blue"}`}>
+                    {listing.listingType === "ONE_TIME" ? "One-time Sale" : "Unlimited Stock"}
+                  </span>
                   <span className="badge badge-blue">Proof required</span>
                 </div>
               </div>
@@ -157,7 +160,7 @@ export default async function ListingPage({ params }: PageProps) {
                   {listing.priceLabel}
                 </div>
                 <span className="muted">Escrow protected checkout.</span>
-                <ListingActions listingId={listing.id} />
+                <ListingActions listingId={listing.id} sellerId={listing.sellerId} />
               </div>
             </div>
 

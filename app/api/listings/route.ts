@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -34,11 +35,11 @@ export async function GET(req: Request) {
   const sellerIds = Array.from(new Set(listings.map((listing) => listing.sellerId)));
   const reviewStats = sellerIds.length
     ? await prisma.review.groupBy({
-        by: ["toId"],
-        where: { toId: { in: sellerIds } },
-        _avg: { rating: true },
-        _count: { rating: true },
-      })
+      by: ["toId"],
+      where: { toId: { in: sellerIds } },
+      _avg: { rating: true },
+      _count: { rating: true },
+    })
     : [];
 
   const reviewBySeller = new Map(
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
       stock,
       deliveryType,
       imageUrl,
+      listingType,
     } = body;
 
     // 3) Vérifier les champs obligatoires
@@ -111,6 +113,9 @@ export async function POST(req: Request) {
       });
     }
 
+    console.log(`[LISTING_CREATE] Body:`, JSON.stringify(body));
+    console.log(`[LISTING_CREATE] priceCents: ${priceCents}`);
+
     // 5) Créer l'annonce liée au user connecté
     const listing = await prisma.listing.create({
       data: {
@@ -122,11 +127,12 @@ export async function POST(req: Request) {
         priceCents,
         stock: stock ?? 1,
         deliveryType,
+        listingType: listingType || "STOCK",
         // currency et escrowOnly ont des valeurs par défaut dans Prisma
         images: imageUrl
           ? {
-              create: [{ url: imageUrl }],
-            }
+            create: [{ url: imageUrl }],
+          }
           : undefined,
       },
       include: {
@@ -138,7 +144,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ listing }, { status: 201 });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.error("LISTING_CREATE_ERROR:", e);
+    return NextResponse.json({ error: "Server error", details: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
 }

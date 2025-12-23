@@ -25,10 +25,10 @@ export default function LoginPage() {
           {/* Titre */}
           <div>
             <div className="h2" style={{ marginBottom: 4 }}>
-              Connexion
+              Sign In
             </div>
             <div className="p" style={{ fontSize: 14, color: "#8b8b8b" }}>
-              Connecte-toi avec Discord pour accéder au site.
+              Sign in with Discord to access the marketplace.
             </div>
           </div>
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
                 padding: "6px 10px",
               }}
             >
-              Une erreur est survenue pendant la connexion. Réessaie.
+              An error occurred during sign in. Please try again.
             </div>
           ) : null}
 
@@ -61,7 +61,7 @@ export default function LoginPage() {
             }}
             onClick={() => signIn("discord", { callbackUrl: "/" })}
           >
-            <span>Continuer avec Discord</span>
+            <span>Continue with Discord</span>
           </button>
 
           {/* Séparateur */}
@@ -75,7 +75,7 @@ export default function LoginPage() {
                 color: "#999",
               }}
             >
-              Dev uniquement (local)
+              Dev only (local)
             </div>
           ) : null}
 
@@ -120,7 +120,7 @@ export default function LoginPage() {
               marginTop: 4,
             }}
           >
-            En continuant, tu acceptes les conditions d&apos;utilisation.
+            By continuing, you agree to our terms and conditions.
           </div>
         </div>
       </div>
