@@ -11,14 +11,14 @@ const REWARD_LABELS: Record<string, string> = {
 };
 
 export default function WheelPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [canSpin, setCanSpin] = useState(false);
   const [spinStatus, setSpinStatus] = useState<string>("Checking...");
   const [spinning, setSpinning] = useState(false);
   const [reward, setReward] = useState<any>(null);
 
   async function loadStatus() {
-    const res = await fetch("/api/wheel", { credentials: "include" });
+    const res = await fetch("/api/wheel", { credentials: "same-origin" });
     if (!res.ok) {
       setSpinStatus("Sign in to spin.");
       return;
@@ -29,7 +29,7 @@ export default function WheelPage() {
   }
 
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "authenticated" && session?.user?.id) {
       loadStatus();
       return;
     }
@@ -46,7 +46,7 @@ export default function WheelPage() {
     }
     setSpinning(true);
     setReward(null);
-    const res = await fetch("/api/wheel", { method: "POST", credentials: "include" });
+    const res = await fetch("/api/wheel", { method: "POST", credentials: "same-origin" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setSpinStatus(data.error || "Unable to spin");

@@ -12,7 +12,7 @@ function isValidEmail(email: string) {
 
 export default function VerifySetupPage() {
   const { status } = useSession();
-  const [email, setEmail] = useState("");
+  const [privateEmail, setPrivateEmail] = useState("");
   const [mcUsername, setMcUsername] = useState("");
   const [realName, setRealName] = useState("");
   const [tosAccepted, setTosAccepted] = useState(false);
@@ -25,11 +25,11 @@ export default function VerifySetupPage() {
     let active = true;
     async function loadSetup() {
       try {
-        const res = await fetch("/api/verify/status");
+        const res = await fetch("/api/verify/setup");
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
-        setEmail(data.email ?? "");
+        setPrivateEmail(data.privateEmail ?? "");
         setMcUsername(data.mcUsername ?? "");
         setRealName(data.realName ?? "");
         setTosAccepted(Boolean(data.tosAccepted));
@@ -46,7 +46,7 @@ export default function VerifySetupPage() {
 
   const validation = useMemo(() => {
     const errors: string[] = [];
-    if (email && !isValidEmail(email)) {
+    if (privateEmail && !isValidEmail(privateEmail)) {
       errors.push("Enter a valid email address.");
     }
     if (mcUsername && !MC_USERNAME_REGEX.test(mcUsername)) {
@@ -56,7 +56,14 @@ export default function VerifySetupPage() {
       errors.push("Real name must be at least 2 characters.");
     }
     return errors;
-  }, [email, mcUsername, realName]);
+  }, [privateEmail, mcUsername, realName]);
+
+  const emailError = privateEmail && !isValidEmail(privateEmail) ? "Enter a valid email address." : null;
+  const mcError =
+    mcUsername && !MC_USERNAME_REGEX.test(mcUsername)
+      ? "Minecraft username must be 3-16 characters (letters, numbers, underscore)."
+      : null;
+  const nameError = realName && realName.trim().length < 2 ? "Real name must be at least 2 characters." : null;
 
   async function handleSubmit() {
     setMessage(null);
@@ -75,7 +82,7 @@ export default function VerifySetupPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email.trim(),
+          privateEmail: privateEmail.trim(),
           mcUsername: mcUsername.trim(),
           realName: realName.trim(),
           tosAccepted,
@@ -151,10 +158,11 @@ export default function VerifySetupPage() {
                 id="verify-email"
                 className="input"
                 type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                value={privateEmail}
+                onChange={(event) => setPrivateEmail(event.target.value)}
                 placeholder="you@example.com"
               />
+              {emailError && <div className="small" style={{ color: "#fca5a5" }}>{emailError}</div>}
               <div className="small muted">Why we ask: contact you about payouts and disputes.</div>
             </div>
 
@@ -169,6 +177,7 @@ export default function VerifySetupPage() {
                 onChange={(event) => setMcUsername(event.target.value)}
                 placeholder="PlayerName"
               />
+              {mcError && <div className="small" style={{ color: "#fca5a5" }}>{mcError}</div>}
               <div className="small muted">Why we ask: match listings to in-game delivery.</div>
             </div>
 
@@ -183,6 +192,7 @@ export default function VerifySetupPage() {
                 onChange={(event) => setRealName(event.target.value)}
                 placeholder="Your real name"
               />
+              {nameError && <div className="small" style={{ color: "#fca5a5" }}>{nameError}</div>}
               <div className="small muted">Why we ask: payout compliance and fraud prevention.</div>
             </div>
 
@@ -194,7 +204,7 @@ export default function VerifySetupPage() {
                   onChange={(event) => setTosAccepted(event.target.checked)}
                 />
                 <span>
-                  I agree to the <Link href="/rules">Terms of Service</Link>.
+                  I agree to the <Link href="/tos">Terms of Service</Link>.
                 </span>
               </label>
               <div className="small muted">Why we ask: required to keep the marketplace safe.</div>
@@ -208,6 +218,9 @@ export default function VerifySetupPage() {
             >
               {loading ? "Saving..." : "Save setup"}
             </button>
+            <div className="small muted">
+              You can save progress anytime. Selling stays locked until all fields are complete and the TOS is accepted.
+            </div>
             {message && <div className="muted">{message}</div>}
           </div>
         </div>
