@@ -37,7 +37,7 @@ export default function FeaturedTrades() {
     <section className="container section perspective-1000" ref={ref}>
       <div className={`section-header reveal ${isVisible ? 'is-visible' : ''}`}>
         <span className="kicker">Featured trades</span>
-        <h2 className="h2">Browse what's moving fast right now.</h2>
+        <h2 className="h2">Browse what&apos;s moving fast right now.</h2>
         <p className="p">
           High-demand categories with escrow on by default.
         </p>

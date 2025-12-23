@@ -45,6 +45,8 @@ model User {
   wheelSpins     WheelSpin[]
   coupons        UserCoupon[]
   sellerStats    SellerStats?
+  followers      Follow[] @relation("UserFollowers")
+  following      Follow[] @relation("UserFollowing")
 
 }
 
@@ -406,4 +408,16 @@ model TradeMessage {
 
   content   String
   createdAt DateTime @default(now())
+}
+
+model Follow {
+  followerId String
+  followingId String
+
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id])
+  following User @relation("UserFollowers", fields: [followingId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@id([followerId, followingId])
 }

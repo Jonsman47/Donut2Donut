@@ -3,10 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { auth } from '@/auth';
-import { Session } from 'next-auth';
-import { redirect } from 'next/navigation';
-import React from 'react';
 import { toast } from 'react-hot-toast';
 
 type ProfileData = {
@@ -21,6 +17,8 @@ type ProfileData = {
   averageRating: number;
   totalRatings: number;
   successRate: number;
+  completedTrades: number;
+  averageResponseTime: string;
   responseTime: string;
   followersCount: number;
   followingCount: number;
@@ -44,6 +42,8 @@ const defaultProfile: ProfileData = {
   averageRating: 0,
   totalRatings: 0,
   successRate: 0,
+  completedTrades: 0,
+  averageResponseTime: '0',
   responseTime: '0',
   followersCount: 0,
   followingCount: 0,
@@ -56,12 +56,7 @@ const defaultProfile: ProfileData = {
 };
 
 export default function ProfilePage({ params }: { params: { username: string } }) {
-  const { data: session, status } = useSession({
-    required: true,
-    onUnauthenticated() {
-      window.location.href = '/auth/signin';
-    },
-  });
+  const { data: session, status } = useSession();
   
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -72,12 +67,12 @@ export default function ProfilePage({ params }: { params: { username: string } }
   // Charger les données du profil
   useEffect(() => {
     async function fetchProfile() {
-      if (!params.username) return;
+      if (!params.username || status === 'loading') return;
       
       setIsLoading(true);
       try {
         const res = await fetch(`/api/profile/${params.username}`, {
-          credentials: 'include', // Important pour inclure les cookies de session
+          credentials: 'include',
         });
 
         if (!res.ok) {
@@ -91,7 +86,7 @@ export default function ProfilePage({ params }: { params: { username: string } }
         const data = await res.json();
         setProfileData(data);
         setIsFollowing(data.isFollowing);
-        setIsOwner(session?.user?.email === data.email);
+        setIsOwner(session?.user?.id === data.id);
       } catch (error) {
         console.error('Erreur lors du chargement du profil:', error);
         toast.error('Erreur lors du chargement du profil');
@@ -100,17 +95,12 @@ export default function ProfilePage({ params }: { params: { username: string } }
       }
     }
 
-    if (status === 'authenticated') {
-      fetchProfile();
-    } else if (status === 'unauthenticated') {
-      // La redirection est gérée par useSession avec onUnauthenticated
-      setIsLoading(false);
-    }
-  }, [params.username, status, session, router]);
+    fetchProfile();
+  }, [params.username, status, session?.user?.id, router]);
 
   const toggleFollow = async () => {
-    if (!session) {
-      window.location.href = '/auth/signin';
+    if (!session?.user?.id) {
+      router.push('/login');
       return;
     }
 
@@ -120,6 +110,7 @@ export default function ProfilePage({ params }: { params: { username: string } }
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
 
       if (!res.ok) {
@@ -130,15 +121,22 @@ export default function ProfilePage({ params }: { params: { username: string } }
       setIsFollowing(data.isFollowing);
 
       // Mettre à jour le compteur d'abonnés localement
-      if (profileData) {
-        setProfileData({
-          ...profileData,
-          followersCount: data.isFollowing
-            ? profileData.followersCount + 1
-            : Math.max(0, profileData.followersCount - 1),
+      setProfileData((current) => {
+        if (!current) return current;
+
+        const nextFollowers =
+          typeof data.followersCount === 'number'
+            ? data.followersCount
+            : data.isFollowing
+              ? current.followersCount + 1
+              : Math.max(0, current.followersCount - 1);
+
+        return {
+          ...current,
+          followersCount: nextFollowers,
           isFollowing: data.isFollowing,
-        });
-      }
+        };
+      });
 
       toast.success(
         data.isFollowing
@@ -163,10 +161,13 @@ export default function ProfilePage({ params }: { params: { username: string } }
     return (
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold">Profil non trouvé</h1>
-        <p className="text-gray-600 mt-2">Le profil demandé n'existe pas ou n'est pas accessible.</p>
+        <p className="text-gray-600 mt-2">Le profil demandé n&apos;existe pas ou n&apos;est pas accessible.</p>
       </div>
     );
   }
+
+  const parsedResponseTime = Number.parseFloat(profileData.responseTime);
+  const responseTimeValue = Number.isFinite(parsedResponseTime) ? parsedResponseTime : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -345,7 +346,7 @@ export default function ProfilePage({ params }: { params: { username: string } }
                   <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                     <div
                       className="bg-blue-500 h-2 rounded-full"
-                      style={{ width: `${Math.max(0, 100 - (parseFloat(profileData.responseTime) * 10))}%` }}
+                      style={{ width: `${Math.max(0, 100 - (responseTimeValue * 10))}%` }}
                     ></div>
                   </div>
                 </div>
@@ -462,768 +463,6 @@ export default function ProfilePage({ params }: { params: { username: string } }
         @media (max-width: 768px) {
           .container {
             padding: 1rem;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
-          height: 16px;
-          background-color: var(--success);
-          border: 2px solid var(--bg-primary);
-          border-radius: 50%;
-        }
-
-        .profile-avatar img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .avatar-placeholder {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255, 255, 255, 0.8);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          color: white;
-          font-size: 3.5rem;
-          font-weight: 600;
-        }
-
-        .profile-actions {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 1.5rem;
-          width: 100%;
-          margin: 1rem 0;
-        }
-
-        .follow-button {
-          padding: 0.6rem 1.8rem;
-          border: none;
-          border-radius: 12px;
-          background: var(--primary);
-          color: white;
-          font-weight: 600;
-          font-size: 0.95rem;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.2);
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .follow-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(var(--primary-rgb), 0.3);
-        }
-
-        .follow-button.following {
-          background: var(--success);
-          box-shadow: 0 4px 12px rgba(var(--success-rgb), 0.2);
-        }
-
-        .followers-count {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          background: var(--bg-secondary);
-          padding: 0.8rem 1.5rem;
-          border-radius: 12px;
-          min-width: 100px;
-        }
-
-        .followers-count .count {
-          font-size: 1.4rem;
-          font-weight: 700;
-          color: var(--text-primary);
-          line-height: 1;
-        }
-
-        .followers-count .label {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-          font-weight: 500;
-          margin-top: 0.2rem;
-        }
-
-        /* ===== Statistiques ===== */
-        .profile-name-container {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 2rem;
-          margin-top: 1.5rem;
-          flex-wrap: wrap;
-        }
-        
-        .profile-header-actions {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-          background: var(--bg-secondary);
-          padding: 0.6rem 1.2rem;
-          border-radius: 12px;
-          border: 1px solid var(--border-color);
-        }
-        
-        .profile-name {
-          margin: 0;
-          font-size: 1.8rem;
-          font-weight: 800;
-          color: var(--text-primary);
-          line-height: 1.2;
-        }
-
-        .sales-stats {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-          margin: 1.5rem 0;
-          background: var(--bg-secondary);
-          padding: 1.5rem;
-          border-radius: 16px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-        }
-
-        .stat-box {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 1rem 0.5rem;
-          background: var(--bg-primary);
-          border-radius: 12px;
-          transition: transform 0.2s ease;
-        }
-
-        .stat-box:hover {
-          transform: translateY(-2px);
-        }
-
-        .stat-icon {
-          font-size: 1.5rem;
-          margin-bottom: 0.5rem;
-          opacity: 0.9;
-        }
-
-        .stat-box .number {
-          font-size: 1.4rem;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0.2rem 0;
-          line-height: 1;
-        }
-
-        .stat-box .label {
-          font-size: 0.75rem;
-          color: var(--text-muted);
-          font-weight: 500;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .success-rate {
-          background: var(--card-bg);
-          backdrop-filter: blur(10px);
-          border: 1px solid var(--border-color);
-          background: var(--bg-secondary);
-          padding: 1.5rem;
-          border-radius: 16px;
-          margin: 1.5rem 0;
-        }
-
-        .success-label {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 0.8rem;
-          font-size: 0.95rem;
-          color: var(--text-secondary);
-        }
-
-        .success-label .percentage {
-          font-weight: 600;
-          color: var(--success);
-        }
-
-        .progress-bar {
-          height: 8px;
-          background: var(--border-color);
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .progress {
-          height: 100%;
-          background: linear-gradient(90deg, var(--success), #4ade80);
-          border-radius: 4px;
-          transition: width 0.5s ease;
-        }
-
-        /* ===== Section d'activité ===== */
-        .activity-section {
-          grid-row: 1;
-        }
-
-        @media (min-width: 1024px) {
-          .activity-section {
-            grid-column: 1;
-          }
-        }
-
-        /* ===== Cartes et sections ===== */
-        .profile-section {
-          margin-bottom: 1.5rem;
-          background: var(--card-bg);
-          border-radius: 12px;
-          padding: 1.5rem;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-          border: 1px solid var(--border-color);
-        }
-        
-        .profile-section:last-child {
-          margin-bottom: 0;
-        }
-
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1.5rem;
-        }
-        
-        .section-header.centered {
-          justify-content: center;
-        }
-
-        .section-header h2 {
-          font-size: 1.3rem;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-        }
-
-        .view-all {
-          background: none;
-          border: none;
-          color: var(--primary);
-          font-weight: 600;
-          font-size: 0.9rem;
-          cursor: pointer;
-          padding: 0.3rem 0.5rem;
-          border-radius: 6px;
-          transition: all 0.2s ease;
-        }
-
-        .view-all:hover {
-          background: var(--bg-secondary);
-        }
-
-        .edit-button {
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          padding: 0.3rem;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s ease;
-        }
-
-        .edit-button:hover {
-          background: var(--bg-secondary);
-          color: var(--primary);
-        }
-
-        .about-card {
-          background: var(--card-bg);
-          backdrop-filter: blur(5px);
-          border: 1px solid var(--border-color);
-          background: var(--bg-secondary);
-          padding: 1.5rem;
-          border-radius: 12px;
-          line-height: 1.7;
-          color: var(--text-secondary);
-        }
-        
-        .centered-section {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-        
-        .centered-section .section-header {
-          justify-content: center;
-          width: 100%;
-        }
-        
-        .centered-section .about-card {
-          width: 100%;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-        
-        .centered-content {
-          text-align: center;
-        }
-
-        /* ===== Flux d'activité ===== */
-        .activity-feed {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .activity-item {
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(5px);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          display: flex;
-          align-items: center;
-          padding: 1rem;
-          background: var(--bg-secondary);
-          border-radius: 12px;
-          transition: transform 0.2s ease;
-        }
-
-        .activity-item:hover {
-          transform: translateX(4px);
-        }
-
-        .activity-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          background: rgba(var(--primary-rgb), 0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-right: 1rem;
-          color: var(--primary);
-          flex-shrink: 0;
-        }
-
-        .activity-details {
-          flex: 1;
-        }
-
-        .activity-details p {
-          margin: 0 0 0.2rem 0;
-          font-size: 0.95rem;
-        }
-
-        .activity-time {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-        }
-
-        .activity-amount {
-          font-weight: 600;
-          color: var(--success);
-          margin-left: 1rem;
-        }
-
-        .listings-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .listing-card {
-          background: var(--card-bg);
-          backdrop-filter: blur(5px);
-          border: 1px solid var(--border-color);
-          background: var(--bg-secondary);
-          border-radius: 12px;
-          overflow: hidden;
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .listing-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-        }
-
-        .listing-image {
-          height: 140px;
-          background: linear-gradient(45deg, #f3f4f6, #e5e7eb);
-          background-size: 200% 200%;
-          animation: gradient 3s ease infinite;
-        }
-
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-
-        .listing-details {
-          padding: 1.25rem;
-        }
-
-        .listing-details h3 {
-          margin: 0 0 0.5rem 0;
-          font-size: 1.1rem;
-          color: var(--text-primary);
-        }
-
-        .listing-price {
-          font-weight: 700;
-          color: var(--primary);
-          font-size: 1.2rem;
-          margin: 0 0 0.75rem 0;
-        }
-
-        .listing-meta {
-          display: flex;
-          gap: 1rem;
-          font-size: 0.85rem;
-          color: var(--text-muted);
-        }
-
-        .no-items {
-          grid-column: 1 / -1;
-          text-align: center;
-          padding: 3rem 1rem;
-          color: var(--text-muted);
-          font-style: italic;
-        }
-
-        @media (max-width: 768px) {
-          .container {
-            padding: 1rem;
-          }
-          .profile-header {
-            padding: 1.5rem 1rem;
-            border-radius: 0 0 16px 16px;
-          }
-
-          .profile-avatar {
-            width: 120px;
-            height: 120px;
-          }
-
-          .profile-actions {
-            flex-direction: column;
-            gap: 1rem;
-          }
-
-          .followers-count {
-            width: 100%;
-          }
-
-          .follow-button {
-            width: 100%;
-            justify-content: center;
-          }
-
-          .sales-stats {
-            grid-template-columns: 1fr;
-            gap: 0.75rem;
-          }
-
-          .stat-box {
-            flex-direction: row;
-            justify-content: space-between;
-            padding: 1rem;
-            text-align: left;
-          }
-
-          .stat-icon {
-            margin: 0 1rem 0 0;
-            font-size: 1.2rem;
-          }
-
-          .stat-box .number {
-            font-size: 1.2rem;
-            margin: 0;
-          }
-
-          .listings-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .profile-actions-mobile {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 1.5rem;
-            width: 100%;
-            margin-bottom: 1.5rem;
-            padding: 0.8rem;
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-          }
-
-          .profile-actions-mobile .followers-count {
-            margin: 0;
-            padding: 0.5rem 1rem;
-            background: var(--bg-primary);
-            border-radius: 8px;
-          }
-          
-          .profile-actions-mobile .follow-button {
-            flex: 1;
-            max-width: 150px;
-            margin: 0;
-          }
-        }
-
-        /* ===== Côté droit (pour desktop) ===== */
-        @media (min-width: 769px) {
-          .profile-actions-mobile {
-            display: flex;
-            max-width: 400px;
-            margin: 0 auto 2rem;
-          }
-        }
-          padding: 0.5rem 1.5rem;
-          border: none;
-          border-radius: 20px;
-          background-color: var(--primary);
-          color: white;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .follow-button:hover {
-          opacity: 0.9;
-          transform: translateY(-1px);
-        }
-
-        .follow-button.following {
-          background-color: var(--success);
-        }
-
-        .followers-count {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        .followers-count .count {
-          font-size: 1.2rem;
-          font-weight: 600;
-          color: var(--text-primary);
-        }
-
-        .followers-count .label {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-        }
-
-        .sales-stats {
-          display: flex;
-          justify-content: space-around;
-          margin-bottom: 2rem;
-          padding: 1rem;
-          background: var(--bg-secondary);
-          border-radius: 8px;
-        }
-
-        .stat-box {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 0.5rem 1rem;
-        }
-
-        .stat-box .number {
-          font-size: 1.4rem;
-          font-weight: 700;
-          color: var(--primary);
-          margin-bottom: 0.3rem;
-        }
-
-        .stat-box .label {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .loading-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 300px;
-          gap: 1rem;
-        }
-
-        .loading-spinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid var(--border-color);
-          border-top-color: var(--primary);
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        .rating-stars {
-          color: #ffd700;
-          font-size: 1.2rem;
-          letter-spacing: 2px;
-          margin: 0.5rem 0;
-        }
-
-        .rating-stars .star {
-          position: relative;
-          display: inline-block;
-          color: #e0e0e0;
-        }
-
-        .rating-stars .star.filled {
-          color: #ffd700;
-        }
-
-        .rating-stars .star.half::before {
-          content: '★';
-          position: absolute;
-          left: 0;
-          width: 50%;
-          overflow: hidden;
-          color: #ffd700;
-        }
-
-        .success-bar {
-          width: 100%;
-          height: 6px;
-          background-color: #e0e0e0;
-          border-radius: 3px;
-          margin-top: 8px;
-          overflow: hidden;
-        }
-
-        .success-progress {
-          height: 100%;
-          background-color: var(--success);
-          border-radius: 3px;
-          transition: width 0.3s ease;
-        }
-
-        .nav-item.no-dropdown .nav-trigger.no-dropdown {
-          display: flex;
-          align-items: center;
-          gap: 2rem;
-          margin-bottom: 2rem;
-          padding: 2rem 0;
-        }
-
-        .profile-header {
-          display: flex;
-          align-items: center;
-          gap: 2rem;
-          margin-bottom: 2rem;
-          padding: 2rem 0;
-          border-bottom: 1px solid var(--border-color);
-        }
-
-        .profile-avatar {
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          overflow: hidden;
-          background-color: var(--bg-secondary);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 3rem;
-          font-weight: bold;
-          color: var(--text-muted);
-        }
-
-        .profile-avatar img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .profile-info h1 {
-          margin: 0 0 0.5rem 0;
-          font-size: 2rem;
-        }
-
-        .email {
-          color: var(--text-muted);
-          margin: 0 0 1.5rem 0;
-        }
-
-        .stats {
-          display: flex;
-          gap: 2rem;
-        }
-
-        .stat {
-          text-align: center;
-        }
-
-        .stat-number {
-          display: block;
-          font-size: 1.5rem;
-          font-weight: 600;
-          color: var(--primary);
-        }
-
-        .stat-label {
-          font-size: 0.9rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .profile-section {
-          margin-bottom: 3rem;
-        }
-
-        .profile-section h2 {
-          margin-bottom: 1.5rem;
-          padding-bottom: 0.5rem;
-          border-bottom: 1px solid var(--border-color);
-        }
-
-        .about-text {
-          line-height: 1.6;
-          color: var(--text-secondary);
-        }
-
-        .listings-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .no-items {
-          color: var(--text-muted);
-          font-style: italic;
-          grid-column: 1 / -1;
-          text-align: center;
-          padding: 2rem 0;
-        }
-
-        @media (max-width: 768px) {
-          .profile-header {
-            flex-direction: column;
-            text-align: center;
-          }
-
-          .stats {
-            justify-content: center;
           }
         }
       `}</style>

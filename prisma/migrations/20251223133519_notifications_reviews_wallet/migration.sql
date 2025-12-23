@@ -11,19 +11,19 @@
 
 */
 -- DropIndex
-DROP INDEX "Conversation_listingId_buyerId_sellerId_key";
+DROP INDEX IF EXISTS "Conversation_listingId_buyerId_sellerId_key";
 
 -- DropIndex
-DROP INDEX "Message_conversationId_createdAt_idx";
+DROP INDEX IF EXISTS "Message_conversationId_createdAt_idx";
 
 -- DropTable
 PRAGMA foreign_keys=off;
-DROP TABLE "Conversation";
+DROP TABLE IF EXISTS "Conversation";
 PRAGMA foreign_keys=on;
 
 -- DropTable
 PRAGMA foreign_keys=off;
-DROP TABLE "Message";
+DROP TABLE IF EXISTS "Message";
 PRAGMA foreign_keys=on;
 
 -- CreateTable
@@ -163,7 +163,10 @@ CREATE TABLE "new_Listing" (
 INSERT INTO "new_Listing" ("active", "categoryId", "createdAt", "currency", "deliveryType", "description", "escrowOnly", "id", "priceCents", "sellerId", "stock", "title", "updatedAt", "whatYouGet") SELECT "active", "categoryId", "createdAt", "currency", "deliveryType", "description", "escrowOnly", "id", "priceCents", "sellerId", "stock", "title", "updatedAt", "whatYouGet" FROM "Listing";
 DROP TABLE "Listing";
 ALTER TABLE "new_Listing" RENAME TO "Listing";
-CREATE TABLE "new_Notification" (
+
+-- Ensure Notification table exists even when migrating from a schema without it
+DROP TABLE IF EXISTS "Notification";
+CREATE TABLE "Notification" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -176,9 +179,6 @@ CREATE TABLE "new_Notification" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
-INSERT INTO "new_Notification" ("createdAt", "id", "readAt", "type", "userId") SELECT "createdAt", "id", "readAt", "type", "userId" FROM "Notification";
-DROP TABLE "Notification";
-ALTER TABLE "new_Notification" RENAME TO "Notification";
 CREATE TABLE "new_Order" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "buyerId" TEXT NOT NULL,
