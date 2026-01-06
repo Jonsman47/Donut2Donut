@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
 import { refreshSellerStats } from "@/lib/seller-stats";
 import { getVerificationStatus } from "@/lib/verification";
+import { calculatePurchaseSplit, createPurchaseWithLedgers, type PurchaseSplit } from "@/lib/purchases";
 
 export async function POST(
     req: NextRequest,
@@ -24,6 +25,15 @@ export async function POST(
             include: {
                 listing: true,
                 deliveryProofs: true,
+                buyer: {
+                    select: {
+                        id: true,
+                        referredByUserId: true,
+                        vipActiveUntil: true,
+                        vipLifetime: true,
+                        vipStatus: true,
+                    },
+                },
             },
         });
 
@@ -69,27 +79,14 @@ export async function POST(
         const buyerConfirmed = order.buyerId === userId ? true : !!(order as any).buyerConfirmedAt;
         const sellerConfirmed = order.sellerId === userId ? true : !!(order as any).sellerConfirmedAt;
 
+        let completionSplit: PurchaseSplit | null = null;
+
         if (buyerConfirmed && sellerConfirmed) {
             console.log(`[CONFIRM] Both confirmed. Completing order ${orderId}`);
             dataToUpdate.status = "COMPLETED";
             dataToUpdate.releasedAt = new Date();
-
-            try {
-                // Revenue Split: Total - Platform Fee = Seller payout
-                const sellerAmount = order.totalCents - order.platformFeeCents;
-                console.log(`[CONFIRM] Releasing ${sellerAmount} cents to seller ${order.sellerId} (Total: ${order.totalCents}, Fee: ${order.platformFeeCents})`);
-                await prisma.user.update({
-                    where: { id: order.sellerId },
-                    data: {
-                        balanceCents: {
-                            increment: sellerAmount
-                        }
-                    } as any
-                });
-            } catch (payoutErr) {
-                console.error(`[CONFIRM] Payout failed for order ${orderId}:`, payoutErr);
-            }
-
+            completionSplit = calculatePurchaseSplit(order.totalCents, order.buyer as any);
+            dataToUpdate.platformFeeCents = completionSplit.platformFeeCents;
             // Delete listing if it's ONE_TIME
             if ((order.listing as any).listingType === "ONE_TIME") {
                 await prisma.listing.update({
@@ -115,6 +112,31 @@ export async function POST(
         });
 
         if ((updated as any).status === "COMPLETED") {
+            const split = completionSplit ?? calculatePurchaseSplit(updated.totalCents, (order as any).buyer);
+            const sellerAmount = updated.totalCents - split.platformFeeCents;
+
+            try {
+                await prisma.$transaction([
+                    prisma.user.update({
+                        where: { id: order.sellerId },
+                        data: {
+                            balanceCents: {
+                                increment: sellerAmount
+                            }
+                        } as any
+                    }),
+                    createPurchaseWithLedgers({
+                        tx: prisma,
+                        userId: order.buyerId,
+                        amountCents: updated.totalCents,
+                        currency: (order.listing as any).currency ?? "EUR",
+                        split,
+                    }),
+                ]);
+            } catch (payoutErr) {
+                console.error(`[CONFIRM] Payout failed for order ${orderId}:`, payoutErr);
+            }
+
             await Promise.all([
                 createNotification({
                     userId: order.sellerId,

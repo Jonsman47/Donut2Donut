@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
   const creditCents = points; // 100 points = $1 => cents
 
   await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { points: { decrement: points } },
+    }),
     prisma.userWallet.update({
       where: { userId },
       data: {

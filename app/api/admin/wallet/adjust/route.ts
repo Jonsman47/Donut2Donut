@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
   const transactions = [] as any[];
   if (deltaPoints) {
     transactions.push(
+      prisma.user.update({
+        where: { id: userId },
+        data: { points: { increment: deltaPoints } },
+      }),
       prisma.userWallet.update({
         where: { userId },
         data: {

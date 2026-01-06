@@ -7,6 +7,8 @@ export default function WalletPage() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const [convertPoints, setConvertPoints] = useState(100);
   const [message, setMessage] = useState<string | null>(null);
+  const [referral, setReferral] = useState<any>(null);
+  const [referralStatus, setReferralStatus] = useState<string | null>(null);
 
   async function loadWallet() {
     const res = await fetch("/api/wallet");
@@ -16,8 +18,20 @@ export default function WalletPage() {
     setCoupons(data.coupons || []);
   }
 
+  async function loadReferral() {
+    try {
+      const res = await fetch("/api/referrals");
+      if (!res.ok) return;
+      const data = await res.json();
+      setReferral(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   useEffect(() => {
     loadWallet();
+    loadReferral();
   }, []);
 
   async function handleConvert() {
@@ -34,6 +48,17 @@ export default function WalletPage() {
     }
     setMessage("Conversion complete!");
     await loadWallet();
+  }
+
+  async function copyReferralLink() {
+    if (!referral?.referralLink) return;
+    try {
+      await navigator.clipboard.writeText(referral.referralLink);
+      setReferralStatus("Referral link copied!");
+    } catch (err) {
+      console.error(err);
+      setReferralStatus("Unable to copy link. Try manually copying it.");
+    }
   }
 
   return (
@@ -66,6 +91,44 @@ export default function WalletPage() {
                 Lifetime discount: {(wallet?.lifetimeDiscountBps ?? 0) / 10}%
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="surface" style={{ padding: 18, borderRadius: 18 }}>
+          <div className="stack-8">
+            <strong>Referral rewards</strong>
+            <div className="muted">
+              Share your link to earn 10 points when someone signs up, plus 3% from their purchases. Owners keep
+              7% (or 3.5% if the buyer is VIP).
+            </div>
+            <div className="stack-6" style={{ wordBreak: "break-word" }}>
+              <div className="muted" style={{ fontSize: 12 }}>Your code</div>
+              <div className="surface" style={{ padding: 10, borderRadius: 10 }}>
+                {referral?.referralCode ?? "Loading..."}
+              </div>
+              <div className="muted" style={{ fontSize: 12 }}>Referral link</div>
+              <div className="surface" style={{ padding: 10, borderRadius: 10 }}>
+                {referral?.referralLink ?? "Loading..."}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-secondary" type="button" onClick={copyReferralLink} disabled={!referral?.referralLink}>
+                Copy link
+              </button>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  if (referral?.referralLink) {
+                    window.open(referral.referralLink, "_blank");
+                  }
+                }}
+                disabled={!referral?.referralLink}
+              >
+                Open link
+              </button>
+            </div>
+            {referralStatus && <div className="muted">{referralStatus}</div>}
           </div>
         </div>
 

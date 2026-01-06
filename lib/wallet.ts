@@ -22,6 +22,10 @@ export async function addPoints({
 }) {
   await getOrCreateWallet(userId);
   await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { points: { increment: deltaPoints } },
+    }),
     prisma.userWallet.update({
       where: { userId },
       data: {

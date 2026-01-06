@@ -23,6 +23,12 @@ model User {
   realName      String?
   tosAcceptedAt DateTime?
   setupCompletedAt DateTime?
+  referralCode     String?   @unique
+  referredByUserId String?
+  points           Int       @default(0)
+  vipStatus        String    @default("none") // none | monthly | yearly | lifetime
+  vipActiveUntil   DateTime?
+  vipLifetime      Boolean   @default(false)
 
   sellerProfile  SellerProfile?
   listings       Listing[]
@@ -45,6 +51,11 @@ model User {
   wheelSpins     WheelSpin[]
   coupons        UserCoupon[]
   sellerStats    SellerStats?
+  referredBy     User?        @relation("UserReferrals", fields: [referredByUserId], references: [id])
+  referrals      User[]       @relation("UserReferrals")
+  purchases      Purchase[]
+  referrerPurchases Purchase[] @relation("PurchaseReferrer")
+  payoutLedgers  PayoutLedger[]
 
 }
 
@@ -359,6 +370,34 @@ model Dispute {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amountCents       Int
+  currency          String
+  ownerCutAmount    Int
+  referrerUserId    String?
+  referrer          User?    @relation("PurchaseReferrer", fields: [referrerUserId], references: [id])
+  referrerCutAmount Int
+  vipApplied        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  payoutLedgers PayoutLedger[]
+}
+
+model PayoutLedger {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  role        String
+  amountCents Int
+  currency    String
+  createdAt   DateTime @default(now())
 }
 
 model Report {

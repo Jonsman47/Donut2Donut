@@ -11,20 +11,31 @@
 
 */
 -- DropIndex
-DROP INDEX "Conversation_listingId_buyerId_sellerId_key";
+DROP INDEX IF EXISTS "Conversation_listingId_buyerId_sellerId_key";
 
 -- DropIndex
-DROP INDEX "Message_conversationId_createdAt_idx";
+DROP INDEX IF EXISTS "Message_conversationId_createdAt_idx";
 
 -- DropTable
 PRAGMA foreign_keys=off;
-DROP TABLE "Conversation";
+DROP TABLE IF EXISTS "Conversation";
 PRAGMA foreign_keys=on;
 
 -- DropTable
 PRAGMA foreign_keys=off;
-DROP TABLE "Message";
+DROP TABLE IF EXISTS "Message";
 PRAGMA foreign_keys=on;
+
+-- Ensure Notification exists for data copy on fresh databases
+CREATE TABLE IF NOT EXISTS "Notification" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "data" TEXT NOT NULL,
+    "readAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
 
 -- CreateTable
 CREATE TABLE "SiteReview" (

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
+import { calculatePurchaseSplit } from "@/lib/purchases";
 
 export async function POST(req: NextRequest) {
   try {
@@ -103,7 +104,8 @@ export async function POST(req: NextRequest) {
     const discountCap = Math.round(subtotalCents * 0.3);
     const discountCents = Math.min(rawDiscountCents, discountCap);
     const totalCents = Math.max(subtotalCents - discountCents, 0);
-    const platformFeeCents = Math.round(totalCents * 0.1);
+    const commissionSplit = calculatePurchaseSplit(totalCents, buyer);
+    const platformFeeCents = commissionSplit.platformFeeCents;
 
     console.log(`[ORDER_CREATE] listing.priceCents=${listing.priceCents}, quantity=${quantity}, totalCents=${totalCents}, fee=${platformFeeCents}`);
 
