@@ -5,6 +5,7 @@ import DiscordProvider from "next-auth/providers/discord";
 import { z } from "zod";
 
 import { db } from "./db";
+import { ensureReferralCodeForUser } from "./referrals";
 
 type TokenShape = {
   uid?: string;
@@ -59,6 +60,7 @@ async function upsertDiscordUser(params: {
       },
       include: { sellerProfile: true },
     });
+    await ensureReferralCodeForUser(user.id);
 
     if (!user.sellerProfile) {
       await db.sellerProfile.create({ data: { userId: user.id } });
@@ -76,6 +78,7 @@ async function upsertDiscordUser(params: {
       sellerProfile: { create: {} },
     },
   });
+  await ensureReferralCodeForUser(user.id);
   return user;
 }
 
