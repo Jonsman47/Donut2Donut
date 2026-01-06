@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getListingById } from "@/lib/demo";
+import { getListingById, type Listing } from "@/lib/demo";
 import { ListingActions } from "./ListingActions";
 import { getDonutImage } from "@/lib/donut-images";
 
@@ -16,6 +16,10 @@ type TradeStage =
   | "PROOFS"
   | "COMPLETE"
   | "DISPUTE";
+
+function getTradeStage(_listing: Listing): TradeStage {
+  return "REQUEST";
+}
 
 export default async function ListingPage({ params }: PageProps) {
   const listing = await getListingById(params.id);
@@ -40,7 +44,7 @@ export default async function ListingPage({ params }: PageProps) {
     );
   }
 
-  const stage: TradeStage = "REQUEST";
+  const stage = getTradeStage(listing);
 
   return (
     <div>

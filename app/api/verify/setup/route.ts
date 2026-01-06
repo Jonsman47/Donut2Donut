@@ -27,12 +27,13 @@ function resolveProfileStatus(params: {
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const sessionUser = session?.user as { id?: string } | undefined;
+  if (!sessionUser?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id as string },
+  const userProfile = await prisma.user.findUnique({
+    where: { id: sessionUser.id as string },
     select: {
       privateEmail: true,
       mcUsername: true,
@@ -43,31 +44,32 @@ export async function GET() {
     },
   });
 
-  if (!user) {
+  if (!userProfile) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   const status = resolveProfileStatus({
-    privateEmail: user.privateEmail ?? null,
-    mcUsername: user.mcUsername ?? null,
-    realName: user.realName ?? null,
-    tosAcceptedAt: user.tosAcceptedAt ?? null,
-    discordId: user.discordId ?? null,
+    privateEmail: userProfile.privateEmail ?? null,
+    mcUsername: userProfile.mcUsername ?? null,
+    realName: userProfile.realName ?? null,
+    tosAcceptedAt: userProfile.tosAcceptedAt ?? null,
+    discordId: userProfile.discordId ?? null,
   });
 
   return NextResponse.json({
-    privateEmail: user.privateEmail,
-    mcUsername: user.mcUsername,
-    realName: user.realName,
-    tosAcceptedAt: user.tosAcceptedAt,
-    setupCompletedAt: user.setupCompletedAt,
+    privateEmail: userProfile.privateEmail,
+    mcUsername: userProfile.mcUsername,
+    realName: userProfile.realName,
+    tosAcceptedAt: userProfile.tosAcceptedAt,
+    setupCompletedAt: userProfile.setupCompletedAt,
     ...status,
   });
 }
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const sessionUser = session?.user as { id?: string } | undefined;
+  if (!sessionUser?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -100,7 +102,7 @@ export async function POST(req: NextRequest) {
   }
 
   const existing = await prisma.user.findUnique({
-    where: { id: session.user.id as string },
+    where: { id: sessionUser.id as string },
     select: {
       privateEmail: true,
       mcUsername: true,
@@ -130,7 +132,7 @@ export async function POST(req: NextRequest) {
   });
 
   const update = await prisma.user.update({
-    where: { id: session.user.id as string },
+    where: { id: sessionUser.id as string },
     data: {
       privateEmail: privateEmail ?? undefined,
       mcUsername: mcUsername ?? undefined,

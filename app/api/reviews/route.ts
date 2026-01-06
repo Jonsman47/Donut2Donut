@@ -11,11 +11,12 @@ const MAX_REVIEW_LENGTH = 500;
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.id) {
+    const user = session?.user as { id?: string } | undefined;
+    if (!user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const userId = session.user.id as string;
+    const userId = user.id as string;
     const body = await req.json().catch(() => null);
     const orderId = body?.orderId as string | undefined;
     const ratingValue = body?.rating as number | string | undefined;

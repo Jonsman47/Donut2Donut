@@ -389,7 +389,7 @@ export default function MarketPage() {
       return 0;
     });
 
-  const setupBlocked = status === "authenticated" && verifyStatus && !verifyStatus.setupComplete;
+  const setupBlocked = status === "authenticated" && !!verifyStatus && !verifyStatus.setupComplete;
 
   return (
     <div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { signIn, useSession } from "next-auth/react";
 
@@ -12,12 +12,13 @@ const REWARD_LABELS: Record<string, string> = {
 
 export default function WheelPage() {
   const { data: session, status } = useSession();
+  const userId = (session?.user as { id?: string } | undefined)?.id;
   const [canSpin, setCanSpin] = useState(false);
   const [spinStatus, setSpinStatus] = useState<string>("Checking...");
   const [spinning, setSpinning] = useState(false);
   const [reward, setReward] = useState<any>(null);
 
-  async function loadStatus() {
+  const loadStatus = useCallback(async () => {
     const res = await fetch("/api/wheel", { credentials: "same-origin" });
     if (!res.ok) {
       setSpinStatus("Sign in to spin.");
@@ -26,10 +27,10 @@ export default function WheelPage() {
     const data = await res.json();
     setCanSpin(data.canSpin);
     setSpinStatus(data.canSpin ? "Free spin available" : "Next spin tomorrow");
-  }
+  }, []);
 
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.id) {
+    if (status === "authenticated" && userId) {
       loadStatus();
       return;
     }
@@ -37,7 +38,7 @@ export default function WheelPage() {
       setCanSpin(false);
       setSpinStatus("Sign in to spin.");
     }
-  }, [status]);
+  }, [loadStatus, status, userId]);
 
   async function spin() {
     if (status !== "authenticated") {
