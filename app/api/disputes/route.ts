@@ -17,7 +17,9 @@ export async function POST(req: Request) {
   if (order.buyerId !== user.id) return NextResponse.json({ error: "Not your order" }, { status: 403 });
 
   const now = new Date();
-  if (now > order.buyerDisputeDeadline) return NextResponse.json({ error: "Dispute window expired" }, { status: 400 });
+  if (!order.buyerDisputeDeadline || now > order.buyerDisputeDeadline) {
+    return NextResponse.json({ error: "Dispute window expired" }, { status: 400 });
+  }
 
   const dispute = await db.dispute.create({
     data: {

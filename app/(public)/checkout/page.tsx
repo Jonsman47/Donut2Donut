@@ -1,8 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="card"><div className="pill" style={{ marginTop: 10 }}>Loading checkout…</div></div>}>
+      <CheckoutContent />
+    </Suspense>
+  );
+}
+
+function CheckoutContent() {
   const sp = useSearchParams();
   const listingId = sp.get("listingId");
   const [status, setStatus] = useState<string>("");

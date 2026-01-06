@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
+  const user = session?.user as { id?: string } | undefined;
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Rating must be between 1 and 5" }, { status: 400 });
   }
 
-  const userId = session.user.id as string;
+  const userId = user.id as string;
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const existing = await prisma.siteReview.findFirst({
     where: { userId, createdAt: { gte: thirtyDaysAgo } },

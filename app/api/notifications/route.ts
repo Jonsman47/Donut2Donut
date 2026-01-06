@@ -5,11 +5,12 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
+  const user = session?.user as { id?: string } | undefined;
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const userId = session.user.id as string;
+  const userId = user.id as string;
   const url = new URL(req.url);
   const type = url.searchParams.get("type");
   const unreadOnly = url.searchParams.get("unread") === "1";

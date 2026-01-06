@@ -5,11 +5,12 @@ import { markAllNotificationsRead } from "@/lib/notifications";
 
 export async function POST() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
+  const user = session?.user as { id?: string } | undefined;
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  await markAllNotificationsRead(session.user.id as string);
+  await markAllNotificationsRead(user.id as string);
 
   return NextResponse.json({ ok: true });
 }

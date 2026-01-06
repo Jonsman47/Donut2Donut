@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { formatCurrency, formatDate, getStatusTone } from "@/lib/order-utils";
 
@@ -111,10 +112,12 @@ export default function OrderList({ role }: { role: OrderListRole }) {
             style={{ padding: 18 }}
           >
             <div style={{ display: "flex", gap: 14 }}>
-              <img
+              <Image
                 src={imageUrl ?? "/donut-hero.png"}
                 alt={order.listing.title}
-                style={{ width: 72, height: 72, borderRadius: 12, objectFit: "cover" }}
+                width={72}
+                height={72}
+                style={{ borderRadius: 12, objectFit: "cover" }}
               />
               <div className="stack-4" style={{ flex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>

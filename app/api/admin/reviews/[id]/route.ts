@@ -9,11 +9,12 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
+  const user = session?.user as { id?: string; role?: string } | undefined;
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const role = (session.user as any).role as string;
+  const role = user.role ?? "";
   if (!role || !["ADMIN", "MOD"].includes(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

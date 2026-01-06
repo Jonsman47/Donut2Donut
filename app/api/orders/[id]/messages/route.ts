@@ -9,11 +9,12 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.id) {
+    const user = session?.user as { id?: string } | undefined;
+    if (!user?.id) {
         return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const userId = session.user.id as string;
+    const userId = user.id as string;
     const orderId = params.id;
 
     const order = await prisma.order.findUnique({
@@ -46,11 +47,12 @@ export async function POST(
     { params }: { params: { id: string } }
 ) {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.id) {
+    const user = session?.user as { id?: string } | undefined;
+    if (!user?.id) {
         return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const userId = session.user.id as string;
+    const userId = user.id as string;
     const orderId = params.id;
     const body = await req.json().catch(() => null);
 

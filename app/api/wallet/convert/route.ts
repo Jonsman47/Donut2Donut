@@ -6,7 +6,8 @@ import { createNotification } from "@/lib/notifications";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
+  const user = session?.user as { id?: string } | undefined;
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Points must be a positive multiple of 100" }, { status: 400 });
   }
 
-  const userId = session.user.id as string;
+  const userId = user.id as string;
   const wallet = await prisma.userWallet.findUnique({ where: { userId } });
   if (!wallet || wallet.pointsBalance < points) {
     return NextResponse.json({ error: "Not enough points" }, { status: 400 });

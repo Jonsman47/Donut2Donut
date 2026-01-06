@@ -6,11 +6,12 @@ import { getOrCreateWallet } from "@/lib/wallet";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
+  const user = session?.user as { id?: string } | undefined;
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const userId = session.user.id as string;
+  const userId = user.id as string;
   const wallet = await getOrCreateWallet(userId);
   const coupons = await prisma.userCoupon.findMany({
     where: { userId, isUsed: false },

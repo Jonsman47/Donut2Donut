@@ -6,11 +6,12 @@ import { getOrCreateWallet } from "@/lib/wallet";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
+  const user = session?.user as { id?: string; role?: string } | undefined;
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const role = (session.user as any).role as string;
+  const role = user.role ?? "";
   if (!role || !["ADMIN", "MOD"].includes(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
           userId,
           source: "admin",
           deltaPoints,
-          meta: JSON.stringify({ adminId: session.user.id }),
+          meta: JSON.stringify({ adminId: user.id }),
         },
       })
     );
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
           userId,
           source: "admin",
           deltaCents,
-          meta: JSON.stringify({ adminId: session.user.id }),
+          meta: JSON.stringify({ adminId: user.id }),
         },
       })
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -21,7 +21,7 @@ export default function OrderPage() {
     const [proofs, setProofs] = useState<any[]>([]);
 
     // Fetch order on load and when actions complete
-    const fetchOrder = async () => {
+    const fetchOrder = useCallback(async () => {
         try {
             const res = await fetch(`/api/orders/${orderId}`);
             if (!res.ok) {
@@ -42,7 +42,7 @@ export default function OrderPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [orderId, userId]);
 
     useEffect(() => {
         if (authStatus === "authenticated") {
@@ -53,7 +53,7 @@ export default function OrderPage() {
         } else if (authStatus === "unauthenticated") {
             router.push("/login");
         }
-    }, [authStatus, orderId, router]);
+    }, [authStatus, fetchOrder, router]);
 
     // Proofs are fetched with order data - no separate polling needed
 
@@ -501,7 +501,7 @@ function TradeChat({ orderId, userId }: { orderId: string; userId: string }) {
     const [sending, setSending] = useState(false);
     const scrollRef = React.useRef<HTMLDivElement>(null);
 
-    const fetchMessages = async () => {
+    const fetchMessages = useCallback(async () => {
         try {
             const res = await fetch(`/api/orders/${orderId}/messages`);
             if (res.ok) {
@@ -511,13 +511,13 @@ function TradeChat({ orderId, userId }: { orderId: string; userId: string }) {
         } catch (e) {
             console.error(e);
         }
-    };
+    }, [orderId]);
 
     useEffect(() => {
         fetchMessages();
         const interval = setInterval(fetchMessages, 3000);
         return () => clearInterval(interval);
-    }, [orderId]);
+    }, [fetchMessages, orderId]);
 
     useEffect(() => {
         if (scrollRef.current) {

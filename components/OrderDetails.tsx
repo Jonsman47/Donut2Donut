@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { formatCurrency, formatDate, getNextActionBanner, getStatusTone } from "@/lib/order-utils";
@@ -38,6 +39,7 @@ type OrderDetail = {
 
 export default function OrderDetails({ orderId }: { orderId: string }) {
   const { data: session } = useSession();
+  const userId = (session?.user as { id?: string } | undefined)?.id;
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,11 +51,11 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
   const [reviewState, setReviewState] = useState<string | null>(null);
 
   const role = useMemo(() => {
-    if (!order || !session?.user?.id) return null;
-    if (order.buyer.id === session.user.id) return "buyer";
-    if (order.seller.id === session.user.id) return "seller";
+    if (!order || !userId) return null;
+    if (order.buyer.id === userId) return "buyer";
+    if (order.seller.id === userId) return "seller";
     return null;
-  }, [order, session?.user?.id]);
+  }, [order, userId]);
 
   useEffect(() => {
     let active = true;
@@ -166,7 +168,6 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
     ? getNextActionBanner({
         status: order.status,
         role,
-        deliveryType: order.listing.deliveryType,
       })
     : "";
 
@@ -178,10 +179,12 @@ export default function OrderDetails({ orderId }: { orderId: string }) {
         <div className="stack-6">
           <span className="kicker">Order {order.id.slice(0, 8).toUpperCase()}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <img
+            <Image
               src={imageUrl}
               alt={order.listing.title}
-              style={{ width: 88, height: 88, borderRadius: 12, objectFit: "cover" }}
+              width={88}
+              height={88}
+              style={{ borderRadius: 12, objectFit: "cover" }}
             />
             <div className="stack-4" style={{ flex: 1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>

@@ -35,7 +35,7 @@ export default function ReviewsStrip() {
               style={{ transitionDelay: `${i * 150}ms` }}
             >
               <div className="review-stars" style={{ color: '#fbbf24', fontSize: '1.2rem' }}>{"★★★★★"}</div>
-              <p className="p" style={{ fontSize: '1.05rem', fontStyle: 'italic', opacity: 0.9 }}>"{r.text}"</p>
+              <p className="p" style={{ fontSize: '1.05rem', fontStyle: 'italic', opacity: 0.9 }}>“{r.text}”</p>
               <div className="muted" style={{ fontWeight: 600 }}>— {r.name}</div>
             </div>
           ))}
