@@ -32,3 +32,38 @@ jobs:
 
       - name: Build
         run: npm run build --if-present
+        
+-- name: Deploy release to /opt/webapp/releases/${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_DIR="/opt/webapp"
+          RELEASE_DIR="$APP_DIR/releases/${{ github.sha }}"
+
+          # Create release dir
+          sudo mkdir -p "$APP_DIR/releases" "$APP_DIR/shared"
+          sudo rm -rf "$RELEASE_DIR"
+          sudo mkdir -p "$RELEASE_DIR"
+
+          # Copy everything needed (excluding .git). Include .next from the build.
+          # Option A: ship node_modules too (fast, since build already happened on the same VM)
+          sudo rsync -a --delete \
+            --exclude ".git" \
+            "$GITHUB_WORKSPACE/" "$RELEASE_DIR/"
+
+          # Ensure correct ownership
+          sudo chown -R webapp:webapp "$RELEASE_DIR"
+
+          # Run DB migrations (recommended for production)
+          # Load env from the same env file systemd uses:
+          # sudo -u webapp bash -lc "set -a; source /etc/webapp.env; set +a; cd '$RELEASE_DIR' && npx prisma migrate deploy"
+
+          # Atomic switch
+          sudo ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
+          
+    - name: Restart service
+        run: |
+          sudo systemctl daemon-reload
+          sudo systemctl restart webapp.service
+          sudo systemctl status webapp.service      
