@@ -116,23 +116,23 @@ export async function POST(
             const sellerAmount = updated.totalCents - split.platformFeeCents;
 
             try {
-                await prisma.$transaction([
-                    prisma.user.update({
+                await prisma.$transaction(async (tx) => {
+                    await tx.user.update({
                         where: { id: order.sellerId },
                         data: {
                             balanceCents: {
                                 increment: sellerAmount
                             }
                         } as any
-                    }),
-                    createPurchaseWithLedgers({
-                        tx: prisma,
+                    });
+                    await createPurchaseWithLedgers({
+                        tx,
                         userId: order.buyerId,
                         amountCents: updated.totalCents,
                         currency: (order.listing as any).currency ?? "EUR",
                         split,
-                    }),
-                ]);
+                    });
+                });
             } catch (payoutErr) {
                 console.error(`[CONFIRM] Payout failed for order ${orderId}:`, payoutErr);
             }

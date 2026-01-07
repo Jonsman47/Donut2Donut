@@ -27,55 +27,50 @@ export async function POST(req: NextRequest) {
 
   await getOrCreateWallet(userId);
 
-  const transactions = [] as any[];
-  if (deltaPoints) {
-    transactions.push(
-      prisma.user.update({
+  if (!deltaPoints && !deltaCents) {
+    return NextResponse.json({ error: "No adjustments provided" }, { status: 400 });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (deltaPoints) {
+      await tx.user.update({
         where: { id: userId },
         data: { points: { increment: deltaPoints } },
-      }),
-      prisma.userWallet.update({
+      });
+      await tx.userWallet.update({
         where: { userId },
         data: {
           pointsBalance: { increment: deltaPoints },
           lifetimePointsEarned: deltaPoints > 0 ? { increment: deltaPoints } : undefined,
         },
-      }),
-      prisma.pointsLedger.create({
+      });
+      await tx.pointsLedger.create({
         data: {
           userId,
           source: "admin",
           deltaPoints,
           meta: JSON.stringify({ adminId: user.id }),
         },
-      })
-    );
-  }
+      });
+    }
 
-  if (deltaCents) {
-    transactions.push(
-      prisma.userWallet.update({
+    if (deltaCents) {
+      await tx.userWallet.update({
         where: { userId },
         data: {
           creditBalanceCents: { increment: deltaCents },
         },
-      }),
-      prisma.creditLedger.create({
+      });
+      await tx.creditLedger.create({
         data: {
           userId,
           source: "admin",
           deltaCents,
           meta: JSON.stringify({ adminId: user.id }),
         },
-      })
-    );
-  }
-
-  if (transactions.length === 0) {
-    return NextResponse.json({ error: "No adjustments provided" }, { status: 400 });
-  }
-
-  await prisma.$transaction(transactions);
+      });
+    }
+  });
 
   return NextResponse.json({ ok: true });
 }
