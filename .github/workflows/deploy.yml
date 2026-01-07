@@ -33,7 +33,7 @@ jobs:
       - name: Build
         run: npm run build --if-present
         
--- name: Deploy release to /opt/webapp/releases/${{ github.sha }}
+      - name: Deploy release to /opt/webapp/releases/${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
