@@ -25,35 +25,35 @@ export async function POST(req: NextRequest) {
 
   const creditCents = points; // 100 points = $1 => cents
 
-  await prisma.$transaction([
-    prisma.user.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
       where: { id: userId },
       data: { points: { decrement: points } },
-    }),
-    prisma.userWallet.update({
+    });
+    await tx.userWallet.update({
       where: { userId },
       data: {
         pointsBalance: { decrement: points },
         creditBalanceCents: { increment: creditCents },
       },
-    }),
-    prisma.pointsLedger.create({
+    });
+    await tx.pointsLedger.create({
       data: {
         userId,
         source: "convert",
         deltaPoints: -points,
         meta: JSON.stringify({ creditCents }),
       },
-    }),
-    prisma.creditLedger.create({
+    });
+    await tx.creditLedger.create({
       data: {
         userId,
         source: "convert",
         deltaCents: creditCents,
         meta: JSON.stringify({ points }),
       },
-    }),
-  ]);
+    });
+  });
 
   await createNotification({
     userId,

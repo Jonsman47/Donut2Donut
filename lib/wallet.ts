@@ -21,27 +21,27 @@ export async function addPoints({
   meta?: Record<string, any>;
 }) {
   await getOrCreateWallet(userId);
-  await prisma.$transaction([
-    prisma.user.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
       where: { id: userId },
       data: { points: { increment: deltaPoints } },
-    }),
-    prisma.userWallet.update({
+    });
+    await tx.userWallet.update({
       where: { userId },
       data: {
         pointsBalance: { increment: deltaPoints },
         lifetimePointsEarned: deltaPoints > 0 ? { increment: deltaPoints } : undefined,
       },
-    }),
-    prisma.pointsLedger.create({
+    });
+    await tx.pointsLedger.create({
       data: {
         userId,
         source,
         deltaPoints,
         meta: meta ? JSON.stringify(meta) : undefined,
       },
-    }),
-  ]);
+    });
+  });
 }
 
 export async function addCredit({
@@ -56,20 +56,20 @@ export async function addCredit({
   meta?: Record<string, any>;
 }) {
   await getOrCreateWallet(userId);
-  await prisma.$transaction([
-    prisma.userWallet.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.userWallet.update({
       where: { userId },
       data: {
         creditBalanceCents: { increment: deltaCents },
       },
-    }),
-    prisma.creditLedger.create({
+    });
+    await tx.creditLedger.create({
       data: {
         userId,
         source,
         deltaCents,
         meta: meta ? JSON.stringify(meta) : undefined,
       },
-    }),
-  ]);
+    });
+  });
 }
