@@ -62,8 +62,8 @@ jobs:
           # Atomic switch
           sudo ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
           
-          - name: Restart service
-          run: |
+      - name: Restart service
+        run: |
           sudo systemctl daemon-reload
           sudo systemctl restart webapp.service
           sudo systemctl status webapp.service      
